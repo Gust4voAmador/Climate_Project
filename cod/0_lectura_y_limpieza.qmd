@@ -1,0 +1,196 @@
+---
+title: "0_lectura_y_limpieza"
+format: html
+editor: visual
+---
+
+# General configuration
+
+## Clean history and environment
+
+```{r}
+# Clean the environment:
+rm(list = ls(all.names = TRUE)) 
+
+# Clear the history of R, but only if in an interactive session:
+clearhistory = function() {
+  if (interactive()) {
+    write("", file = ".blank")
+    loadhistory(".blank")
+    unlink(".blank")
+  }
+}
+
+clearhistory() 
+
+# Scientific notation:
+options(scipen = 999)
+```
+
+## Packages and libraries
+
+First you must install the `pacman::` package to be able to use the following function that downloads and reads packages automatically.
+
+```{r}
+# install.packages("pacman")
+pacman::p_load(
+  tidyverse, haven, readxl, openxlsx, rio, here, ggthemes, scales, sf, rnaturalearth, httr
+)
+```
+
+------------------------------------------------------------------------
+
+# Data
+
+```{r}
+df1 = read_excel(
+  path = here("2. Data", "Mosquito_Habitat_Mapper_GLOBE_Measurement.xlsx"), 
+  sheet = 2
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(
+        organization_id, site_id, latitude, longitude,
+        measurement_latitude, measurement_longitude, measurement_elevation, 
+        location_accuracy
+        ), 
+      .fns = as.numeric
+      )
+    ) %>% 
+  mutate(
+    measured_on = ymd(measured_on) # Formato: año-mes-día
+    )
+
+# Ver la base de datos: 
+df1
+```
+
+## Modificar la variable `larvae_count`
+
+Nota: hay que fijarse bien la variabe de `larvae_count` porque debe ser numérica, pero originalmente ponen observaciones como: more than 100, 1-25, etc.
+
+```{r}
+df1 %>% 
+  select(larvae_count) %>% 
+  group_by(larvae_count) %>% 
+  count()
+```
+
+## Mapa general
+
+```{r}
+# Base de datos de latitud y longitud: 
+df1_coor = df1 %>% 
+  select(longitude, latitude) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# Mapa mundial:
+#world = rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+world = map_data("world")
+
+# Gráfico del mapa:
+ggplot() +
+  # Añadir la capa del mapa mundial:
+  # geom_sf(
+  #   data = world, 
+  #   fill = "gray85", 
+  #   color = "black"
+  #   ) +
+  geom_polygon(
+    data = world, 
+    mapping = aes(x = long, y = lat, group = group), 
+    fill = "gray85", 
+    color = "black"
+    ) + 
+  # Añadir los puntos de las coordenadas de la base de datos de Mosquitos:
+  geom_sf(
+    data = df1_coor, 
+    color = "tomato", 
+    size = 0.8
+    ) +
+  theme_minimal() +
+  labs(
+    x = "Longitud", 
+    y = "Latitud"
+    )
+```
+
+## Mapa de Latinoamérica
+
+```{r}
+# Cargar datos de países de Latinoamérica
+latam <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  filter(region_un == "Americas" & subregion != "Northern America")
+
+# Verificar el CRS de latam
+# st_crs(latam)
+
+# Convertir df1 a un objeto sf (con CRS 4326)
+puntos <- df1 %>%
+  select(longitude, latitude, elevation) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# Asegurarse de que latam y puntos tienen el mismo CRS
+if (st_crs(puntos) != st_crs(latam)) {
+  latam <- st_transform(latam, crs = st_crs(puntos))
+}
+
+# Identificar puntos en Latinoamérica usando st_intersects, sin filtrar
+system.time({
+  interseccion <- st_intersects(puntos, latam)
+  
+  # Crear una columna que indique si el punto está en Latinoamérica
+  puntos <- puntos %>%
+    mutate(en_latam = lengths(interseccion) > 0)
+})
+
+# Crear el gráfico de puntos en Latinoamérica
+mapa = ggplot() +
+  geom_sf(data = latam, fill = "gray85", color = "black") +
+  geom_sf(
+    data = puntos %>% filter(en_latam), 
+    color = "red", 
+    size = 1
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Mosquito breeding sites in Latin America",
+    subtitle = str_glue("Total mosquito breeding sites: {sum(puntos$en_latam)}"),
+    caption = "Source: Authors using data from the GLOBE Mosquito Habitat Mapper (MHM) protocol."
+    ) +
+  theme(
+    plot.title = element_text(hjust = 0, face = "bold"),
+    plot.subtitle = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0)
+    )
+
+# Mostrar el gráfico
+mapa
+
+# Si quieres guardar el gráfico, descomenta la siguiente línea:
+# ggsave("puntos_latinoamerica.png", mapa, width = 12, height = 8, dpi = 300)
+
+# Añadir la información de vuelta a df1 (manteniendo la longitud correcta)
+df1 <- df1 %>%
+  mutate(en_latam = puntos$en_latam)
+
+# Ver un resumen de df1
+df1 %>%
+  summarise(
+    total_puntos = n(),
+    across(en_latam, list(
+      puntos = ~sum(.x, na.rm = TRUE),
+      porcentaje = ~mean(.x, na.rm = TRUE) * 100
+    ), .names = "{.fn}_en_latam")
+  ) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+```
+
+------------------------------------------------------------------------
+
+## Save data
+
+```{r}
+save(df1, file = here("2. Data", "data_MHM_clean.Rdata"))
+```
