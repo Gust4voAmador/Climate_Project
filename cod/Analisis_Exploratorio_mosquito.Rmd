@@ -26,8 +26,14 @@ library(ggplot2)
 
 #Llamar datos
 data_ori <- read_excel("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/ASISTENCIA/Fabio Sánchez/Análisis exploratorio/data/GLOBEMeasurementData-21594.xlsx")
-#View(data_ori)
+View(data_ori)
 print(data_ori)
+```
+
+```{r}
+Mosquito_Habitat_Mapper_GLOBE_Measurement <- read_excel("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/ASISTENCIA/Fabio Sánchez/Climate_Project/data/Mosquito_Habitat_Mapper_GLOBE_Measurement.xlsx", 
+    sheet = "Data")
+View(Mosquito_Habitat_Mapper_GLOBE_Measurement)
 ```
 
 
@@ -37,28 +43,28 @@ print(data_ori)
 # Cargando una librería para utilizar funciones específicas
 
 #Arreglar columnas latitud y longitud a escala
-data_clea <- data_ori
+data_clea <- Mosquito_Habitat_Mapper_GLOBE_Measurement
 
 #Eliminar puntos de cols
-data_clea$latitude <- gsub("\\.", "", data_clea$latitude)
-data_clea$longitude <- gsub("\\.", "", data_clea$longitude)
+#data_clea$latitude <- gsub("\\.", "", data_clea$latitude)
+#data_clea$longitude <- gsub("\\.", "", data_clea$longitude)
 
 #Hacerlas numéricas
-data_clea$latitude <- as.numeric(data_clea$latitude)
-data_clea$longitude <- as.numeric(data_clea$longitude)
-data_clea$elevation <- as.numeric(data_clea$elevation)
+#data_clea$latitude <- as.numeric(data_clea$latitude)
+#data_clea$longitude <- as.numeric(data_clea$longitude)
+#data_clea$elevation <- as.numeric(data_clea$elevation)
 
 #escalar columnas
-data_clea$latitude <- round(data_clea$latitude / 1e6, 6)
-data_clea$longitude <- round(data_clea$longitude / 1e6, 6)
+#data_clea$latitude <- round(data_clea$latitude / 1e6, 6)
+#data_clea$longitude <- round(data_clea$longitude / 1e6, 6)
 
-# Fin del bloque de código
+
 ```
 
 ## Renombrar clases de la columna `mosquito habitat mapper:water source`
 ```{r}
 data_clea <- data_clea %>%
-  mutate(`mosquito habitat mapper:water source` = recode(`mosquito habitat mapper:water source`, 
+  mutate(`water_source` = recode(`water_source`, 
                          "swamp or wetland" = "Pantano o humedal", 
                          "can or bottle" = "Lata o botella", 
                          "plant clumps (bamboo etc)" = "Grupo plantas", 
@@ -138,7 +144,7 @@ colores <- c("Pantano o humedal" = "#1f77b4",  # blue
 ```{r}
 
 data_clea <- data_clea %>%
-  mutate(`mosquito habitat mapper:water source type` = recode(`mosquito habitat mapper:water source type`, 
+  mutate(water_source_type = recode(water_source_type, 
                          "still: lake/pond/swamp" = "Pantano/humedal", 
                          "container: natural" = "Cont.natural", 
                          "container: artificial" = "Cont. artificial", 
@@ -199,9 +205,9 @@ ggplot(data_filtered, aes(x = elevation)) +
 ## Histograma de la variable tipo de fuente de agua `mosquito habitat mapper:water source type`
 ```{r, echo=FALSE}
 # Convertir la columna a un factor
-data_clea$`mosquito habitat mapper:water source type` <- as.factor(data_clea$`mosquito habitat mapper:water source type`)
+data_clea$water_source_type <- as.factor(data_clea$water_source_type)
 
-ggplot(data_clea, aes(x = `mosquito habitat mapper:water source type`)) + 
+ggplot(data_clea, aes(x = water_source_type)) + 
   geom_bar(fill = "blue", color = "black") +  # Gráfico de barras de cantidad
   labs(title = "Histograma Tipos de Fuente de Agua", 
        x = "Tipo de Fuente de Agua", 
@@ -218,7 +224,7 @@ print(percentages)
 
 ## Histograma de la variable fuente de agua `mosquito habitat mapper:water source`
 ```{r, echo=FALSE}
-ggplot(data_clea, aes(x = `mosquito habitat mapper:water source`, fill = `mosquito habitat mapper:water source`)) + 
+ggplot(data_clea, aes(x = water_source, fill = water_source)) + 
   geom_bar(color = "black") +  # Gráfico de barras de cantidad
   # geom_text(stat='count', aes(label = ..count..), position = position_stack(vjust = 0.5), color = "white") +  # Agregar etiquetas de cantidad
   labs(title = "Observaciones de Fuentes de Agua", 
@@ -236,10 +242,10 @@ ggplot(data_clea, aes(x = `mosquito habitat mapper:water source`, fill = `mosqui
 ```{r, echo=FALSE}
 
 # Hacer que la columna sea un factor
-data_clea$`mosquito habitat mapper:mosquito pupae` <- as.factor(data_clea$`mosquito habitat mapper:mosquito pupae`)
+data_clea$mosquito_pupae <- as.factor(data_clea$mosquito_pupae)
 
 # Crear un gráfico de barras 
-ggplot(data_clea, aes(x = `mosquito habitat mapper:mosquito pupae`, fill = `mosquito habitat mapper:mosquito pupae`)) + 
+ggplot(data_clea, aes(x = mosquito_pupae, fill = mosquito_pupae)) + 
   geom_bar(color = "black", width = 0.7) +  # Añadir borde negro y ajustar el ancho de las barras
   geom_text(stat='count', aes(label = ..count..), position = position_stack(vjust = 0.5), color = "white", size = 5) +  # Agregar etiquetas centradas
   labs(title = "Registros con pupas", 
@@ -260,10 +266,10 @@ ggplot(data_clea, aes(x = `mosquito habitat mapper:mosquito pupae`, fill = `mosq
 ## Gráfico de barra sobre la variable huevos de mosquito `mosquito habitat mapper:mosquito eggs` 
 ```{r, echo=FALSE}
 #Hacer de que la columna sea un factor
-data_clea$`mosquito habitat mapper:mosquito eggs` <- as.factor(data_clea$`mosquito habitat mapper:mosquito eggs`)
+data_clea$mosquito_eggs <- as.factor(data_clea$mosquito_eggs)
 
 # Crear un gráfico de barras 
-ggplot(data_clea, aes(x = `mosquito habitat mapper:mosquito eggs`, fill = `mosquito habitat mapper:mosquito eggs`)) + 
+ggplot(data_clea, aes(x = mosquito_eggs, fill = mosquito_eggs)) + 
   geom_bar(color = "black", width = 0.7) +  # Añadir borde negro y ajustar el ancho de las barras
   geom_text(stat='count', aes(label = ..count..), position = position_stack(vjust = 0.5), color = "white", size = 5) +  # Agregar etiquetas centradas
   labs(title = "Registros con huevos", 
@@ -281,13 +287,13 @@ ggplot(data_clea, aes(x = `mosquito habitat mapper:mosquito eggs`, fill = `mosqu
 <p>La gráfica muestra que de las fuentes de agua registradas, 10,543 no tienen huevos, 6,784 sí los tienen presencia de huevos,lo que es un indicativo directo de áreas donde la reproducción de mosquitos está activa y 26,483 son registros incompletos (NA). Aunque hay un número considerable de fuentes con huevos, la gran cantidad de datos faltantes podría afectar la precisión del análisis.
 
 
-## Gráfico de barra sobre la variable mosquitos adultos `mosquito habitat mapper:mosquito adults`
+## Gráfico de barra sobre la variable mosquitos adultos `mosquito_adults`
 ```{r, echo=FALSE}
 #Hacer de que la columna sea un factor
-data_clea$`mosquito habitat mapper:mosquito adults` <- as.factor(data_clea$`mosquito habitat mapper:mosquito adults`)
+data_clea$mosquito_adults <- as.factor(data_clea$mosquito_adults)
 
 # Crear un gráfico de barras
-ggplot(data_clea, aes(x = `mosquito habitat mapper:mosquito adults`, fill = `mosquito habitat mapper:mosquito adults`)) + 
+ggplot(data_clea, aes(x = mosquito_adults, fill = mosquito_adults)) + 
   geom_bar(color = "black", width = 0.7) +  # Añadir borde negro y ajustar el ancho de las barras
   geom_text(stat='count', aes(label = ..count..), position = position_stack(vjust = 0.5), color = "white", size = 5) +  # Agregar etiquetas centradas
   labs(title = "Registros con mosquitos adultos", 
@@ -312,7 +318,7 @@ La gráfica muestra los registros de fuentes de agua con mosquitos adultos. De l
 ```{r, echo=FALSE}
 
 # Histograma de la columna genus
-ggplot(data_clea, aes(x = `mosquito habitat mapper:genus`)) +
+ggplot(data_clea, aes(x = species)) +
   geom_bar(fill = "steelblue") +
   labs(title = "Histograma Género de Mosquito",
        x = "Género",
@@ -320,7 +326,7 @@ ggplot(data_clea, aes(x = `mosquito habitat mapper:genus`)) +
   theme_minimal()
 
 # Histograma de la columna species
-ggplot(data_clea, aes(x = reorder(`mosquito habitat mapper:species`, `mosquito habitat mapper:species`, function(x)-length(x)))) +
+ggplot(data_clea, aes(x = reorder(species, species, function(x)-length(x)))) +
   geom_bar(fill = "tomato") +
   coord_flip() +
   labs(title = "Histograma Especie de Mosquito",
@@ -377,14 +383,14 @@ p_valores <- numeric(n_simulaciones)  # Vector para almacenar los p-valores
 
 for (i in 1:n_simulaciones) {
   # Seleccionar aleatoriamente 5 clases de la columna 'fuente de agua'
-  clases_aleatorias <- sample(unique(data_clea$`mosquito habitat mapper:water source`), n_clases)
+  clases_aleatorias <- sample(unique(data_clea$water_source), n_clases)
   
   # Filtrar el data frame con las clases seleccionadas
   datos_filtrados <- data_clea %>%
-    filter(`mosquito habitat mapper:water source` %in% clases_aleatorias)
+    filter(water_source %in% clases_aleatorias)
   
   # Crear tabla de contingencia entre 'género' y 'fuente de agua'
-  tabla_contingencia <- table(datos_filtrados$`mosquito habitat mapper:genus`, datos_filtrados$`mosquito habitat mapper:water source`)
+  tabla_contingencia <- table(datos_filtrados$genus, datos_filtrados$water_source)
   
   # Usar prueba chi-cuadrado o prueba exacta de Fisher dependiendo de los conteos
   if (min(tabla_contingencia) < 5) {
@@ -420,7 +426,7 @@ print(paste("El promedio de p-valor obtenidos en las 20 pruebas es:", mean(p_val
 
 ```{r, warning=FALSE}
 # Crear tabla de contingencia entre genus y water source type
-tabla_contin <- table(data_clea$`mosquito habitat mapper:genus`, data_clea$`mosquito habitat mapper:water source type`)
+tabla_contin <- table(data_clea$genus, data_clea$water_source_type)
 
 # Usar la prueba de chi-cuadrado
 resultado_test <- chisq.test(tabla_contin)
@@ -440,20 +446,20 @@ print(resultado_test)
 ## Prueba de V-cramer entre las varibles
 ```{r, warning=FALSE}
 # Filtrar datos donde el género sean los principales
-data_selected <- data_clea %>% filter(`mosquito habitat mapper:genus` %in% c("Anopheles", "Culex", "Aedes"))
+data_selected <- data_clea %>% filter(genus %in% c("Anopheles", "Culex", "Aedes"))
 
 # Seleccionar columnas relevantes para el análisis
 relevant_columns <- c(
-  "mosquito habitat mapper:water source",
-  "mosquito habitat mapper:water source type",
-  "mosquito habitat mapper:larvae count",
+  "water_source",
+  "water_source_type",
+  "larvae_count",
   "elevation"
 )
 data_selected_relevant <- data_selected %>% select(all_of(relevant_columns)) %>% na.omit()
 
 results_generos <- list()
-for (column in c("mosquito habitat mapper:water source", "mosquito habitat mapper:water source type")) {
-  contingency_table <- table(data_selected$`mosquito habitat mapper:genus`, data_selected[[column]])
+for (column in c("water_source", "water_source_type")) {
+  contingency_table <- table(data_selected$genus, data_selected[[column]])
   chi_result <- chisq.test(contingency_table)
   results_generos[[column]] <- list(chi2 = chi_result$statistic, p_value = chi_result$p.value)
 }
@@ -475,7 +481,43 @@ print(paste("V de Cramer:", V_cramer))
 
 
 ```
+<p>Con el valor de V de Cramer: 0.0679760508214442. Asociación muy débil: El valor de V de Cramer está cerca de cero, lo cual indica que, aunque haya una asociación significativa entre el género del mosquito y las características de la fuente de agua, la fuerza de esta asociación es muy débil. En otras palabras, el género del mosquito tiene muy poca influencia sobre el tipo de fuente de agua o el tipo de fuente de agua tiene muy poco efecto en determinar el género del mosquito.</p>
 
+
+# Correlación entre la presencia de aedes y variables geográficas
+
+## Calcular la correlacion de Pearson del genero aedes con las variables coordenadas y elevacion
+```{r}
+#Crear un DataFrame con las columnas de interes
+df_geografico <- data.frame(genero = data_clea$genus, latitud = data_clea$latitude, longitud = data_clea$longitude, elevacion = data_clea$elevation)
+
+#Imputar filas con NA en la columna genero
+df_geografico_sin_na <- df_geografico %>% filter(!is.na(genero))
+
+#columna genero a una variable binaria
+df_geografico_sin_na$aedes <- ifelse(df_geografico_sin_na$genero == "Aedes", 1, 0)
+
+#la correlacion de Pearson entre Aedes y las coordenadas (latitud y longitud) conjuntamente
+df_geografico_sin_na$coord_pair <- df_geografico_sin_na$latitud * df_geografico_sin_na$longitud
+cor_coord_pair <- cor(df_geografico_sin_na$aedes, df_geografico_sin_na$coord_pair, use = "complete.obs")
+
+#la correlacion de Pearson entre Aedes y la elevacion
+cor_elevacion <- cor(df_geografico_sin_na$aedes, df_geografico_sin_na$elevacion, use = "complete.obs")
+
+print(paste("Correlacion entre Aedes y coordenadas (latitud * longitud):", cor_coord_pair))
+print(paste("Correlacion entre Aedes y elevacion:", cor_elevacion))
+
+```
+<p>Ambas correlaciones muestran que las variables latitud, longitud (en combinación) y elevación no están fuertemente relacionadas con la presencia de Aedes, lo cual sugiere que otros factores pueden ser más importantes para explicar su distribución.</p>
+
+##  Modelo de regresion logistica para la probabilidad de presencia de Aedes y coordenadas
+```{r}
+modelo_aedes_coords <- glm(aedes ~ latitud + longitud, data = df_geografico_sin_na, family = binomial)
+summary(modelo_aedes_coords)
+```
+<p>Latitud y longitud tienen una influencia significativa sobre la presencia de Aedes.
+La latitud tiene un impacto negativo, lo que sugiere que Aedes es más probable que se encuentre en ciertas áreas más al sur (dependiendo del sistema de referencia).
+La longitud tiene un impacto positivo, aunque menos pronunciado.</p>
 
 
 
