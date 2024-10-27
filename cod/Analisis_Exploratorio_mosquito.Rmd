@@ -37,28 +37,10 @@ View(Mosquito_Habitat_Mapper_GLOBE_Measurement)
 ```
 
 
-# Limpieza de datos
-## Estimación de valores coordenadas
+
 ```{r}
-# Cargando una librería para utilizar funciones específicas
-
-#Arreglar columnas latitud y longitud a escala
+#Asíganción de nueva base de datos con la que se va a trabajar
 data_clea <- Mosquito_Habitat_Mapper_GLOBE_Measurement
-
-#Eliminar puntos de cols
-#data_clea$latitude <- gsub("\\.", "", data_clea$latitude)
-#data_clea$longitude <- gsub("\\.", "", data_clea$longitude)
-
-#Hacerlas numéricas
-#data_clea$latitude <- as.numeric(data_clea$latitude)
-#data_clea$longitude <- as.numeric(data_clea$longitude)
-#data_clea$elevation <- as.numeric(data_clea$elevation)
-
-#escalar columnas
-#data_clea$latitude <- round(data_clea$latitude / 1e6, 6)
-#data_clea$longitude <- round(data_clea$longitude / 1e6, 6)
-
-
 ```
 
 ## Renombrar clases de la columna `mosquito habitat mapper:water source`
