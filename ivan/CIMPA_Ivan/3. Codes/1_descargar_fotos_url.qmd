@@ -1,0 +1,120 @@
+---
+title: "1_descargar_fotos_url"
+format: html
+editor: visual
+---
+
+# General configuration
+
+## Clean history and environment
+
+```{r}
+# Clean the environment:
+rm(list = ls(all.names = TRUE)) 
+
+# Clear the history of R, but only if in an interactive session:
+clearhistory = function() {
+  if (interactive()) {
+    write("", file = ".blank")
+    loadhistory(".blank")
+    unlink(".blank")
+  }
+}
+
+clearhistory() 
+
+# Scientific notation:
+options(scipen = 999)
+```
+
+## Packages and libraries
+
+First you must install the `pacman::` package to be able to use the following function that downloads and reads packages automatically.
+
+```{r}
+# install.packages("pacman")
+pacman::p_load(
+  tidyverse, haven, readxl, openxlsx, rio, here, ggthemes, scales, sf, rnaturalearth, httr
+)
+```
+
+## Data
+
+```{r}
+load(here("2. Data", "data_MHM_clean.Rdata"))
+```
+
+------------------------------------------------------------------------
+
+# Descargar fotos de criaderos
+
+Solo para LATAM
+
+```{r}
+# Filtrar el dataframe para obtener solo las filas donde en_latam es TRUE
+df_filtrado = df1 %>% 
+  # Filtrar solo para LATAM:
+  filter(en_latam == TRUE)
+
+# Limpiar las URLs: eliminar espacios en blanco al principio y al final y reemplazar espacios con %20
+df_filtrado$water_source_photo_urls <- trimws(df_filtrado$water_source_photo_urls)
+df_filtrado$water_source_photo_urls <- gsub(" ", "%20", df_filtrado$water_source_photo_urls)
+
+# Extraer solo la primera URL antes del primer punto y coma
+df_filtrado$water_source_photo_urls <- sub(";.*", "", df_filtrado$water_source_photo_urls)
+
+# Filtrar valores nulos o vacíos en las URLs
+df_filtrado <- df_filtrado %>% filter(!is.na(water_source_photo_urls) & water_source_photo_urls != "")
+
+# Filtrar URLs mal formadas (opcional)
+df_filtrado <- df_filtrado %>% filter(grepl("^(http|https)://", water_source_photo_urls))
+
+# Crear una carpeta para guardar las imágenes si no existe
+ruta_carpeta <- here("2. Data/Photos/water_source_photo")
+if (!dir.exists(ruta_carpeta)) {
+    dir.create(ruta_carpeta, recursive = TRUE)
+}
+
+# Inicializar un contador para los nombres de archivo y un contador para las imágenes descargadas
+contador <- 1
+imagenes_descargadas <- 0
+
+# Medir el tiempo de inicio
+inicio_tiempo <- Sys.time()
+
+# Descargar las imágenes
+for (i in 1:nrow(df_filtrado)) {
+    url <- df_filtrado$water_source_photo_urls[i]
+    
+    # Verificar si la URL es válida
+    if (!is.na(url) && url != "") {
+        cat("Intentando descargar:", url, "\n")
+        
+        # Descargar la imagen con manejo de errores
+        tryCatch({
+            response <- GET(url)
+            if (status_code(response) == 200) {
+                nombre_archivo <- paste0(ruta_carpeta, "/", sprintf("%04d", contador), ".jpg")  # Formato de 4 dígitos
+                writeBin(content(response, "raw"), nombre_archivo)
+                cat("Descargada:", nombre_archivo, "\n")
+                contador <- contador + 1  # Incrementar el contador solo si se descarga exitosamente
+                imagenes_descargadas <- imagenes_descargadas + 1  # Contar imágenes descargadas
+            } else {
+                cat("Error al descargar:", url, "Código de estado:", status_code(response), "\n")
+            }
+        }, error = function(e) {
+            cat("Se produjo un error al procesar la URL:", url, "\nError:", e$message, "\n")
+        })
+    } else {
+        cat("URL vacía o NA en la fila:", i, "\n")
+    }
+}
+
+# Medir el tiempo de finalización
+fin_tiempo = Sys.time()
+
+# Calcular y mostrar el tiempo total de ejecución
+tiempo_total = difftime(fin_tiempo, inicio_tiempo, units = "secs")
+cat("Total de imágenes descargadas:", imagenes_descargadas, "\n")
+cat("Tiempo total de ejecución:", tiempo_total, "segundos\n")
+```

@@ -1,0 +1,889 @@
+---
+title: "Análisis inicial de las bases de datos del MINSA y Casos de Dengue (Fabio)"
+#subtitle: ""
+author: 
+  - name: Iván Daniel Rodríguez Cruz
+    url: https://www.linkedin.com/in/iv%C3%A1n-daniel-rodr%C3%ADguez-cruz-2471a325a/  
+    email: ivan.rodriguezcruz@ucr.ac.cr
+    affiliation: Escuela de Estadística, Universidad de Costa Rica (UCR) - Asistente del Instituto de Investigaciones Sociales (IIS) y del Centro de Investigación en Matemática Pura y Aplicada (CIMPA)
+    corresponding: true
+    
+lang: es  
+date: today
+format: 
+  html:
+    code-fold: false 
+    code-tools: 
+      source: true
+      toggle: true
+    code-link: true
+    page-layout: full
+    title-block-banner: true 
+    toc: true
+    toc-depth: 3
+    toc-title: "Tabla de contenidos"
+    toc_fload: true
+    warning: false
+    message: false
+    df-print: paged
+    reference-location: margin 
+editor: visual
+execute:
+  echo: false
+crossref:
+  chapters: true
+---
+
+# General configuration
+
+## Clean history and environment
+
+```{r}
+# Clean the environment:
+rm(list = ls(all.names = TRUE)) 
+
+# Clear the history of R, but only if in an interactive session:
+clearhistory = function() {
+  if (interactive()) {
+    write("", file = ".blank")
+    loadhistory(".blank")
+    unlink(".blank")
+  }
+}
+
+clearhistory() 
+
+# Scientific notation:
+options(scipen = 999)
+```
+
+## Packages and libraries
+
+First you must install the `pacman::` package to be able to use the following function that downloads and reads packages automatically.
+
+```{r}
+# install.packages("pacman")
+pacman::p_load(
+  tidyverse, haven, readxl, openxlsx, rio, here, ggthemes, scales, sf, sjmisc, mice
+)
+
+# Leer las geometrías de los mapas de los cantones:
+geo_canton = read_sf(here("2. Data/MAPAS/UGEC_MGN_2022", "UGEC_MGN_2022.shp"))
+```
+
+
+---
+
+# BASE DE DATOS DE LA DRA. ADRIANA TROYO
+
+Esta es la base de datos que proporcionó la investigadora Dra. Adriana Troyo de la Facultad de Microbiología. 
+
+```{r}
+df1 = read.csv(file = here("2. Data", "base_MINSA.csv"), sep = ";")
+df1 = df1 %>% mutate(FIS = dmy(FIS))
+```
+
+
+## Variables
+
+La base de datos incluye las siguientes variables. Es importante destacar que aquellas marcadas con un (*) son variables que requieren recodificación, pero esta debe realizarse bajo supervisión. Adicionalmente, hay algunas variables cuya definición no es clara, y están indicadas con un (?). Por lo tanto, las variables que conforman la base de datos son las siguientes:
+
+1.   CONSECUTIVO.UIS: Identificador único asociado a...
+2.   AREA: Área de salud del MINSA.
+3.   FIS: ?
+4.   SEFIS: ?
+5.   DXN: Tipo de enfermedad sin codificar. 
+6.   FDX: ?
+7.   SEDX: 
+8.   DXW: ?
+9.   SEXO: Sexo de la persona.
+10.  EMBARAZO: Tiene o no embarazo (mujeres). 
+11.  HOSP: ?
+12.  ETNIA: Grupo étnico. 
+13.  EANOS: Edad en años cumplidos.
+14.  EMESES: Mes?
+15.  EDIAS: Días?
+16.  NAC: Nacionalidad de la persona.*
+17.  OCUP: Ocupación de la persona.*
+18.  PROV: Provincia.*
+19.  COD_PROV: Código de la provincia.
+20.  PROVINCIA: Provincia recodificada.
+21.  CANT: Cantón. 
+22.  COD_CANT: Código del cantón.
+23.  DIST: Distrito.
+24.  COD_DIST: Código del distrito.
+25.  LTRABAJO: Lugar de trabajo.*
+26.  PROV.1: Provincia (mal codificada).
+27.  CANT.1: Cantón (mal codificada).
+28.  EINFORME: ?
+29.  FTM: ?
+30.  RLAB: Resultado de laboratorio.* 
+31.  FINVEST: ?
+32.  DXFINAL: Tipo de dengue detectado (codificación final MINSA).
+33.  CLASIFICACION: Clasificación de la prueba de laborario.*
+34.  REGION: Región MINSA.
+35.  UIS: ?
+36.  AÑO: Año de la observación. 
+
+```{r}
+df1 = df1 %>%
+  # Sexo: 
+  mutate(
+    SEXO = fct_collapse(SEXO, M = c("M", "M "))
+    ) %>% 
+  # Embarazo:
+  mutate(
+    EMBARAZO = case_when(
+      EMBARAZO %in% c("(-)", "( - )", "( - ) ", "NI", "NO") ~ "No",
+      EMBARAZO %in% c("Ninguno", "no aplica", "No Aplica", "NO APLICA", "No Aplica ", "No indca") ~ "No aplica",
+      TRUE ~ "Sí"
+    ) 
+  ) %>% 
+  # Hosp:
+  mutate(
+    HOSP = case_when(
+      HOSP %in% c("NO", "NO ") ~ "No", 
+      HOSP == "SI" ~ "Sí",
+      TRUE ~ NA_character_
+    )
+  ) %>% 
+  # Etnia:
+  mutate(
+    ETNIA = case_when(
+      ETNIA %in% c("ANGLOSAJON", "ANGLOSAJONA") ~ "Anglosajona",
+      ETNIA %in% c("BLANCA", "BLANCO", "BLANCO HISPANO") ~ "Blanca",
+      ETNIA %in% c("blanco o Mestizo", "Blanco o mestizo", "Blanco o Mestizo", "BLanco o Mestizo", "BLANCO O MESTIZO", "Blanco o Mestizo ", "MESTIZO", "Blanca") ~ "Blanco o Mestizo",
+      ETNIA %in% c("CHINA", "CHINO", "Chino") ~ "China",
+      ETNIA %in% c("DESCONOCIDO", "MENOR") ~ "Desconocido",
+      ETNIA %in% c("Indigena", "INDIGENA","Indígena", "INDIGENAS") ~ "Indígena", 
+      ETNIA %in% c("LATINA", "LATINO", "NICARAGUENSE", "HISPANO") ~ "Latina", 
+      ETNIA %in% c("MORENA", "MORENO") ~ "Morena", 
+      ETNIA %in% c("MULATA", "MULATO") ~ "Mulato",
+      ETNIA %in% c("NEGRA", "NEGRO", "Negro o Afrodescendiente", "NEGRO O AFRODESCENDIENTE", "TRIGUEÑO") ~ "Negro o Afrodescendiente", 
+      TRUE ~ NA_character_
+    )
+  ) %>% 
+  # Provincia:
+  mutate(
+    PROVINCIA = case_when(
+      COD_PROV == "1" ~ "San José", 
+      COD_PROV == "2" ~ "Alajuela", 
+      COD_PROV == "3" ~ "Cartago", 
+      COD_PROV == "4" ~ "Heredia", 
+      COD_PROV == "5" ~ "Guanacaste", 
+      COD_PROV == "6" ~ "Puntarenas", 
+      TRUE ~ "Limón"
+    )
+  ) %>%
+  # FTM Y FINVEST:
+  mutate(
+    FTM = dmy(FTM),
+    FINVEST = dmy(FINVEST) # Hay valores que desde el inicio están más codificados: 40...
+  ) %>% 
+  # Región MINSA:
+  mutate(
+    REGION = factor(case_when(
+      REGION == "BRUNCA" ~ "Brunca", 
+      REGION == "CENTRAL  ESTE" ~ "Central Este",
+      REGION == "CENTRAL NORTE" ~ "Central Norte",
+      REGION == "CENTRAL SUR" ~ "Central Sur",
+      REGION == "CHOROTEGA" ~ "Chorotega",
+      REGION == "HUETAR CARIBE" ~ "Huetar Caribe",
+      REGION == "HUETAR NORTE" ~ "Huetar Norte",
+      REGION == "OCCIDENTAL" ~ "Occidental",
+      REGION == "PACIFICO CENTRAL" ~ "Pacífico Central",
+    ), levels = c("Central Norte", "Central Sur", "Central Este", "Occidental", 
+                  "Chorotega", "Pacífico Central", "Brunca", "Huetar Caribe", "Huetar Norte"))
+  ) %>% 
+  # DXFINAL:
+  mutate(
+    DXFINAL = case_when(
+      DXFINAL == "" ~ NA_character_,  # Si el valor es una cadena vacía, asigna NA
+      is.na(DXFINAL) ~ NA_character_, # Si el valor ya es NA, mantenlo como NA
+      TRUE ~ DXFINAL                 # En caso contrario, deja el valor original
+    )
+  ) %>% 
+  # OCUP:
+  mutate(
+    OCUP = case_when(
+      OCUP == "" ~ NA_character_,  # Si el valor es una cadena vacía, asigna NA
+      is.na(OCUP) ~ NA_character_, # Si el valor ya es NA, mantenlo como NA
+      TRUE ~ OCUP                 # En caso contrario, deja el valor original
+    )
+  ) %>% 
+  # Grupo de edades quinquenales:
+  mutate(
+    EANOS_grupos = cut(
+      EANOS,
+      breaks = seq(0, 105, by = 5), # Crea intervalos de 5 años desde 0 hasta 105
+      labels = c("0-4", "5-9", "10-14", "15-19", "20-24", 
+                 "25-29", "30-34", "35-39", "40-44", "45-49",
+                 "50-54", "55-59", "60-64", "65-69", "70-74",
+                 "75-79", "80-84", "85-89", "90-94", "95-99",
+                 "100+"),
+      right = FALSE  # Define los intervalos como [0, 5), [5, 10), etc.
+    )
+  )
+``` 
+
+
+Sin embargo, las variables marcadas con un (?) corresponden a aquellas cuyo significado o propósito no está del todo claro dado que no se contiene un diccionario previo de las variables. Por ello, es fundamental contar con el acompañamiento de una persona experta que conozca la base de datos o el tema en cuestión, para poder realizar los ajustes necesarios en las variables de interés para el estudio.
+
+
+---
+
+# Análisis inicial
+
+## Tamaño de la base de datos
+
+Esta base de datos cuenta, de forma inicial, con 153,815 observaciones y 37 variables. 
+
+```{r}
+df1 %>% dim
+```
+
+## Valores NAs
+
+La siguiente tabla muestra la cantidad de observaciones vacías (NAs) presentes en cada una de las variables de la base de datos. Es fundamental considerar esta información desde el inicio para evitar la selección de variables con un porcentaje elevado de valores NA en análisis posteriores, ya que esto podría afectar significativamente los resultados (analisis preliminar).
+
+```{r}
+df1 %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "cantidad_NA") %>% 
+  mutate(Prop_total = (cantidad_NA / nrow(df1) * 100) %>% round(2)) %>% 
+  arrange(desc(cantidad_NA))
+```
+
+## Frecuencia de ciertas variables
+
+### Año 
+
+Cerca del 30% de toda la información está disponible para el año 2013.
+
+```{r}
+df1 %>%
+  group_by(AÑO) %>% 
+  summarise(Total = n()) %>% 
+  ggplot(aes(x = as.character(AÑO), y = Total, group = 1)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Total), vjust = -0.5, hjust = 0.5, size = 3) +
+  labs(
+    title = "Cantidad de observaciones por año",
+    x = "Año", 
+    y = "Núm. de observaciones"
+  ) +
+  scale_y_continuous(
+    breaks = seq(2000, 46000, by = 7000)
+  ) +
+  theme_minimal()
+```
+
+
+### Tipo de dengue*
+
+```{r}
+df1 %>% select(DXFINAL) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
+```
+
+
+### Sexo
+
+Prácticamente, hay paridad entre los sexos. 
+
+```{r}
+df1 %>% select(SEXO) %>% sjmisc::frq(out = "viewer")
+```
+
+
+### Grupo de años (quinquenales)
+
+Los grupos de edad de 15-19, 20-24 y 25-29 son los que contienen mayor cantidad de información. 
+
+```{r}
+df1 %>% select(EANOS_grupos) %>% sjmisc::frq(out = "viewer")
+```
+
+
+### Región Minsa
+
+```{r}
+df1 %>% select(REGION) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
+```
+
+
+### Provincia
+
+Las provincias de Limón y Puntarenas son las que poseen un mayor número de casos registrados. 
+
+```{r}
+df1 %>% select(PROVINCIA) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
+```
+
+
+---
+
+# BASE DE DATOS DENGUE FABIO
+
+
+Esta es la base de datos que brindó acceso el Dr. Fabio Sánchez y corresponde a datos sobre Casos de Dengue Detalle por semana epidemiologica según años. 
+
+
+```{r}
+df1_Dengue = read_excel(path = here("2. Data", "base_fabio_dengue.xlsx"), sheet = 1)
+df1_Dengue = df1_Dengue %>% 
+  mutate(
+    Year = str_extract(`Semana/indicador`, "\\d{4}"), # Extrae el año (4 dígitos)
+    Week = as.numeric(str_extract(`Semana/indicador`, "(?<=Sem )\\d+")) # Extrae el número de semana después de "Sem"
+  ) %>% 
+  select(`Semana/indicador`, Year, Week, everything())
+```
+
+
+## Casos de dengue de 1993 a 2012
+
+```{r}
+df1_Dengue = df1_Dengue %>% 
+  select(-`Semana/indicador`) %>% 
+  pivot_longer(cols = 3:84, names_to = "Canton", values_to = "Conteo") %>% 
+  mutate(
+    COD_CANTON = str_extract(Canton, "(?<=_)\\d+(?=_)"), # Extrae el valor numérico entre los guiones bajos
+    CANTON = str_extract(Canton, "(?<=_)[^_]+$") # Extrae el valor después del segundo guion bajo
+  ) %>% 
+  select(Year, Week, COD_CANTON, CANTON, Conteo) %>% 
+  mutate(
+    COD_CANTON = case_when(
+      is.na(COD_CANTON) ~ "99",
+      TRUE ~ COD_CANTON
+    )
+  ) %>% 
+  mutate(
+    Year = as.numeric(Year)
+  ) %>% 
+  mutate(
+    PROVINCIA = case_when(
+      str_starts(COD_CANTON, "1") ~ "San José",
+      # Agrega más condiciones aquí para otros casos
+      str_starts(COD_CANTON, "2") ~ "Alajuela",
+      str_starts(COD_CANTON, "3") ~ "Cartago",
+      str_starts(COD_CANTON, "4") ~ "Heredia",
+      str_starts(COD_CANTON, "5") ~ "Guanacaste",
+      str_starts(COD_CANTON, "6") ~ "Puntarenas",
+      str_starts(COD_CANTON, "7") ~ "Limón",
+      str_starts(COD_CANTON, "99") ~ "País",
+      TRUE ~ NA_character_ # Si no coincide, asigna NA
+    )
+  ) %>% 
+  select(Year, Week, PROVINCIA, COD_CANTON, CANTON, Conteo)
+```
+
+
+Este mapa de calor presenta la distribución temporal de los casos de dengue a nivel nacional, mostrando el número de casos reportados en cada semana epidemiológica y año, utilizando una escala logarítmica para resaltar la variación en la incidencia. En el gráfico, el eje vertical (Y) representa los años del período de estudio, mientras que el eje horizontal (X) corresponde a las semanas del año, de la 1 a la 53. La intensidad de color refleja el nivel de incidencia: los colores más intensos indican una mayor cantidad de casos reportados en esa semana específica de un año determinado. Aunque los datos aquí mostrados son a nivel país, también se dispone de información detallada a nivel cantonal, lo que permite un análisis más desagregado de los patrones de brote y de la estacionalidad en áreas específicas.
+
+
+```{r}
+df1_Dengue %>% 
+  ggplot(aes(x = Week, y = Year, fill = log(Conteo + .5))) + 
+  geom_tile(color = "white") +
+  labs(
+    title = "Casos de dengue (log) reportados a nivel país por semana epidemiológica y año",
+    x = "Semana epidemiológica",
+    y = "Año",
+    fill = "Conteo (log)"
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    palette = "ggthemes::Classic Red"
+    ) +
+  theme_minimal() +
+  scale_x_continuous(
+    breaks = seq(1, 53, by = 4)
+  ) +
+  scale_y_continuous(
+    breaks = seq(1993, 2012, by = 2)
+  )
+```
+
+## Cantidad de casos de dengue desde 1993 hasta 2012 por cantón
+
+```{r}
+## Población 1993 a 2012
+df1_Poblacion = read_excel(path = here("2. Data", "base_fabio_dengue.xlsx"), sheet = 2)
+df1_Poblacion = df1_Poblacion %>% 
+  rename(Year = 1) %>% 
+  pivot_longer(cols = 2:83, names_to = "Canton", values_to = "Poblacion") %>% 
+  mutate(
+    COD_CANTON = str_extract(Canton, "(?<=_)\\d+(?=_)"), # Extrae el valor numérico entre los guiones bajos
+    CANTON = str_extract(Canton, "(?<=_)[^_]+$") # Extrae el valor después del segundo guion bajo
+  ) %>% 
+  select(Year, COD_CANTON, CANTON, Poblacion) %>% 
+  mutate(
+    COD_CANTON = case_when(
+      is.na(COD_CANTON) ~ "99",
+      TRUE ~ COD_CANTON
+    )
+  ) %>% 
+  mutate(
+    CANTON = case_when(
+      is.na(CANTON) ~ "PAIS",
+      TRUE ~ CANTON
+    )
+  ) %>%
+  mutate(
+    Year = as.numeric(Year)
+  ) %>% 
+  mutate(
+    PROVINCIA = case_when(
+      str_starts(COD_CANTON, "1") ~ "San José",
+      # Agrega más condiciones aquí para otros casos
+      str_starts(COD_CANTON, "2") ~ "Alajuela",
+      str_starts(COD_CANTON, "3") ~ "Cartago",
+      str_starts(COD_CANTON, "4") ~ "Heredia",
+      str_starts(COD_CANTON, "5") ~ "Guanacaste",
+      str_starts(COD_CANTON, "6") ~ "Puntarenas",
+      str_starts(COD_CANTON, "7") ~ "Limón",
+      str_starts(COD_CANTON, "99") ~ "País",
+      TRUE ~ NA_character_ # Si no coincide, asigna NA
+    )
+  ) %>% 
+  select(Year, PROVINCIA, COD_CANTON, CANTON, Poblacion)
+```
+
+
+Desde 1993 hasta 2012 se han experimentado por cantón la siguiente cantidad de casos de dengue: 
+
+```{r}
+# Ahora sacamos el conteo por año y canton: 
+totales_all_years = df1_Dengue %>% 
+  group_by(COD_CANTON, CANTON) %>% 
+  summarise(
+    conteo_total_all_years = sum(Conteo, na.rm = T) 
+  ) %>% 
+  arrange(COD_CANTON) %>% 
+  ungroup()
+
+# Población promedio:
+totales_pob_all_years = df1_Poblacion %>% 
+  group_by(COD_CANTON, CANTON) %>% 
+  summarise(
+    conteo_total_all_years = mean(Poblacion, na.rm = T) %>% round(1)
+  ) %>% 
+  arrange(COD_CANTON) %>% 
+  ungroup()
+
+# Casos totales desde 1993 hasta 2012, con población promedio:
+casos_totales_all = totales_pob_all_years %>% 
+  select(-CANTON) %>% 
+  rename(Poblacion_media = 2) %>% 
+  left_join(y = totales_all_years, by = c("COD_CANTON" = "COD_CANTON")) %>% 
+  select(COD_CANTON, CANTON, conteo_total_all_years, Poblacion_media)
+
+casos_totales_all
+```
+
+
+
+```{r}
+## Población 2015 a 2020
+df1_Poblacion_15_20 = read_excel(path = here("2. Data", "base_fabio_dengue.xlsx"), sheet = 4)
+
+df1_Poblacion_15_20 = df1_Poblacion_15_20 %>% 
+  rename(Year = 1) %>% 
+  pivot_longer(cols = 2:83, names_to = "Canton", values_to = "Poblacion") %>% 
+  mutate(
+    COD_CANTON = str_extract(Canton, "(?<=_)\\d+(?=_)"), # Extrae el valor numérico entre los guiones bajos
+    CANTON = str_extract(Canton, "(?<=_)[^_]+$") # Extrae el valor después del segundo guion bajo
+  ) %>% 
+  select(Year, COD_CANTON, CANTON, Poblacion) %>% 
+  mutate(
+    COD_CANTON = case_when(
+      is.na(COD_CANTON) ~ "99",
+      TRUE ~ COD_CANTON
+    )
+  ) %>% 
+  mutate(
+    CANTON = case_when(
+      is.na(CANTON) ~ "PAIS",
+      TRUE ~ CANTON
+    )
+  ) %>%
+  mutate(
+    Year = as.numeric(Year)
+  ) %>% 
+  mutate(
+    PROVINCIA = case_when(
+      str_starts(COD_CANTON, "1") ~ "San José",
+      # Agrega más condiciones aquí para otros casos
+      str_starts(COD_CANTON, "2") ~ "Alajuela",
+      str_starts(COD_CANTON, "3") ~ "Cartago",
+      str_starts(COD_CANTON, "4") ~ "Heredia",
+      str_starts(COD_CANTON, "5") ~ "Guanacaste",
+      str_starts(COD_CANTON, "6") ~ "Puntarenas",
+      str_starts(COD_CANTON, "7") ~ "Limón",
+      str_starts(COD_CANTON, "99") ~ "País",
+      TRUE ~ NA_character_ # Si no coincide, asigna NA
+    )
+  ) %>% 
+  select(Year, PROVINCIA, COD_CANTON, CANTON, Poblacion)
+
+df1_Poblacion_15_20
+```
+
+## Casos de dengue de 2015 a 2020
+
+```{r}
+df1_Dengue_15_20 = read_excel(path = here("2. Data", "base_fabio_dengue.xlsx"), sheet = 5)
+
+df1_Dengue_15_20 = df1_Dengue_15_20 %>% 
+  pivot_longer(cols = 2:83, names_to = "Canton", values_to = "Conteo") %>% 
+  mutate(
+    COD_CANTON = str_extract(Canton, "(?<=_)\\d+(?=_)"), # Extrae el valor numérico entre los guiones bajos
+    CANTON = str_extract(Canton, "(?<=_)[^_]+$") # Extrae el valor después del segundo guion bajo
+  ) %>% 
+  select(Year, COD_CANTON, CANTON, Conteo) %>% 
+  mutate(
+    COD_CANTON = case_when(
+      is.na(COD_CANTON) ~ "99",
+      TRUE ~ COD_CANTON
+    )
+  ) %>% 
+  mutate(
+    CANTON = case_when(
+      is.na(CANTON) ~ "PAIS",
+      TRUE ~ CANTON
+    )
+  ) %>%
+  mutate(
+    Year = as.numeric(Year)
+  ) %>% 
+  mutate(
+    PROVINCIA = case_when(
+      str_starts(COD_CANTON, "1") ~ "San José",
+      # Agrega más condiciones aquí para otros casos
+      str_starts(COD_CANTON, "2") ~ "Alajuela",
+      str_starts(COD_CANTON, "3") ~ "Cartago",
+      str_starts(COD_CANTON, "4") ~ "Heredia",
+      str_starts(COD_CANTON, "5") ~ "Guanacaste",
+      str_starts(COD_CANTON, "6") ~ "Puntarenas",
+      str_starts(COD_CANTON, "7") ~ "Limón",
+      str_starts(COD_CANTON, "99") ~ "País",
+      TRUE ~ NA_character_ # Si no coincide, asigna NA
+    )
+  ) %>% 
+  select(Year, PROVINCIA, COD_CANTON, CANTON, Conteo)
+```
+
+
+
+```{r}
+df1_pob_dengue_15_20 = df1_Poblacion_15_20 %>% 
+  select(Year, COD_CANTON, Poblacion) %>% 
+  left_join(
+    y = df1_Dengue_15_20,
+    by = c("COD_CANTON", "Year")
+    ) %>% 
+  select(Year, PROVINCIA, COD_CANTON, CANTON, Poblacion, Conteo)
+
+df1_pob_dengue_15_20
+```
+
+En esta sección se presenta por año el número de casos de dengue (Conteo), la población por cantón y la tasa de incidencia de cada cantón. 
+
+```{r}
+# https://oges.ministeriodesalud.go.cr/visores/catalogo/enfermedades_vectoriales/dengue_chicongunya.html
+df1_pob_dengue_15_20 = df1_pob_dengue_15_20 %>% 
+  group_by(Year, COD_CANTON) %>% # Agrupar por año y cantón
+  mutate(
+    Tasa_Incidencia = ((Conteo / Poblacion) * 100000) %>% round(2)
+  ) %>%
+  ungroup()
+
+df1_pob_dengue_15_20
+```
+
+
+---
+
+
+
+
+## Promedios hoja TOTALES
+
+### Casos de dengue
+
+En esta tabla se pueden observar la cantidad de casos para los dos períodos de estudio (1993-2012 y 2015-2020), por cantón. 
+
+```{r}
+dengue_final = df1_pob_dengue_15_20 %>% 
+  select(Year, COD_CANTON, Conteo) %>% 
+  group_by(COD_CANTON) %>%
+  summarize(Conteo_15_20 = sum(Conteo, na.rm = TRUE)) %>% 
+  left_join(
+    y = casos_totales_all %>% select(COD_CANTON, conteo_total_all_years) %>% rename(Conteo_93_12 = 2), 
+    by = c("COD_CANTON")
+  ) %>% 
+  group_by(COD_CANTON) %>% 
+  mutate(
+    Conteo_total = sum(Conteo_15_20, Conteo_93_12)
+  ) %>% 
+  ungroup() %>% 
+  left_join(
+    y = casos_totales_all %>% select(COD_CANTON, CANTON),
+    by = c("COD_CANTON")
+  ) %>% 
+  select(COD_CANTON, CANTON, Conteo_93_12, Conteo_15_20, Conteo_total) 
+
+dengue_final
+```
+
+### Población
+
+Aquí podemos observar el número total de personas para los dos períodos de estudio y la población total. 
+
+```{r}
+poblacion_final = df1_pob_dengue_15_20 %>% 
+  select(Year, COD_CANTON, Poblacion) %>% 
+  group_by(COD_CANTON) %>%
+  summarize(Poblacion_2 = mean(Poblacion, na.rm = TRUE) %>% round(0)) %>% 
+  left_join(
+    y = casos_totales_all %>% select(COD_CANTON, Poblacion_media), 
+    by = "COD_CANTON"
+  ) %>% 
+  rename(Poblacion_1 = 3) %>% 
+  group_by(COD_CANTON) %>% 
+  mutate(
+    Poblacion_total = (sum(Poblacion_2, Poblacion_1)/2) %>% round(0)
+  ) %>% 
+  ungroup() %>% 
+  left_join(
+    y = casos_totales_all %>% select(COD_CANTON, CANTON),
+    by = c("COD_CANTON")
+  ) %>% 
+  select(COD_CANTON, CANTON, Poblacion_1, Poblacion_2, Poblacion_total)
+
+poblacion_final
+```
+
+### Tasa de 1993 a 2020
+
+Los siguientes resultados corresponden a porcentaje de incidencia acumulada de casos de dengue en cada región para el período de 1993 a 2020. Específicamente, la tasa nos dice qué porcentaje de la población total de cada cantón $(i)$ ha sido afectada por el dengue durante ese periodo.
+
+
+$$
+\text{Tasa Acumulada de 1993 a 2020} = \dfrac{\text{Cantidad de casos de dengue}_{i}}{\text{Población entre 1993 y 2020}_{i}} \times 100
+$$
+
+#### Interpretación (ejemplo): 
+
+Durante el período de 1993 a 2020, aproximadamente el 2.55% de la población total del cantón de San José fue afectada por casos de dengue.
+
+Esto significa que, de cada 100 personas que vivieron en el cantón de San José durante este periodo, aproximadamente 2 a 3 personas registraron un caso de dengue.
+
+
+```{r}
+tasa_93_20 = dengue_final %>% 
+  select(COD_CANTON, CANTON, Conteo_total) %>% 
+  left_join(
+    y = poblacion_final %>% select(COD_CANTON, Poblacion_total),
+    by = "COD_CANTON"
+  ) %>% 
+  group_by(COD_CANTON, CANTON) %>% 
+  summarise(
+    Tasa_1993_2020 = (Conteo_total/Poblacion_total * 100) %>% round(2)
+  )
+
+tasa_93_20
+```
+
+### Datos totales finales
+
+```{r}
+df_totales = dengue_final %>% 
+  left_join(
+    y = poblacion_final,
+    by = c("COD_CANTON", "CANTON")
+  ) %>% 
+  left_join(
+    y = tasa_93_20,
+    by = "COD_CANTON"
+  )
+
+cantones = c(
+  "San José", "Escazú", "Desamparados", "Puriscal", "Tarrazú", "Aserrí", 
+  "Mora", "Goicoechea", "Santa Ana", "Alajuelita", "Vásquez de Coronado", "Acosta", 
+  "Tibás", "Moravia", "Montes de Oca", "Turrubares", "Dota", "Curridabat", 
+  "Pérez Zeledón", "León Cortés", "Alajuela", "San Ramón", "Grecia", "San Mateo", 
+  "Atenas", "Naranjo", "Palmares", "Poás", "Orotina", "San Carlos", "Zarcero", 
+  "Valverde Vega", "Upala", "Los Chiles", "Guatuso", "Cartago", "Paraíso", 
+  "La Unión", "Jiménez", "Turrialba", "Alvarado", "Oreamuno", "El Guarco", 
+  "Heredia", "Barva", "Santo Domingo", "Santa Bárbara", "San Rafael", "San Isidro", 
+  "Belén", "Flores", "San Pablo", "Sarapiquí", "Liberia", "Nicoya", "Santa Cruz", 
+  "Bagaces", "Carrillo", "Cañas", "Abangares", "Tilarán", "Nandayure", "La Cruz", 
+  "Hojancha", "Puntarenas", "Esparza", "Buenos Aires", "Montes de Oro", "Osa", 
+  "Aguirre", "Golfito", "Coto Brus", "Parrita", "Corredores", "Garabito", 
+  "Limón", "Pococí", "Siquirres", "Talamanca", "Matina", "Guácimo", "Costa Rica"
+)
+
+df_totales = df_totales %>% mutate(CANTON = cantones)
+
+df_totales
+```
+
+### Casos de dengue acumulados de 1993 a 2012
+
+```{r}
+geo_canton %>% 
+  left_join(
+    y = df_totales %>% select(COD_CANTON, CANTON, Conteo_93_12), 
+    by = c("COD_UGEC" = "COD_CANTON")
+    ) %>% 
+  ggplot() +
+  geom_sf(aes(fill = Conteo_93_12, geometry = geometry), color = "gray30", show.legend = T) +
+  coord_sf(xlim = c(230000, 700000), ylim = c(880000, 1241118), expand = FALSE) +
+  labs(
+    fill = "Casos acumulados\n1993-2012" 
+    ) +
+  theme_map() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold")
+    ) +
+  #Paleta de colores: https://pmassicotte.github.io/paletteer_gallery/
+  paletteer::scale_fill_paletteer_c(
+    palette = "ggthemes::Red-Gold",
+    labels = comma_format(),
+    breaks = seq(0, 40000, by = 5000),
+    na.value = "gray"
+    )
+```
+
+
+### Casos de dengue acumulados de 2015 a 2020
+
+```{r}
+geo_canton %>% 
+  left_join(
+    y = df_totales %>% select(COD_CANTON, CANTON, Conteo_15_20), 
+    by = c("COD_UGEC" = "COD_CANTON")
+    ) %>% 
+  ggplot() +
+  geom_sf(aes(fill = Conteo_15_20, geometry = geometry), color = "gray30", show.legend = T) +
+  coord_sf(xlim = c(230000, 700000), ylim = c(880000, 1241118), expand = FALSE) +
+  labs(
+    fill = "Casos acumulados\n2015-2020" 
+    ) +
+  theme_map() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold")
+    ) +
+  #Paleta de colores: https://pmassicotte.github.io/paletteer_gallery/
+  paletteer::scale_fill_paletteer_c(
+    palette = "ggthemes::Red-Gold",
+    labels = comma_format(),
+    breaks = seq(0, 8000, by = 1000),
+    na.value = "gray"
+    )
+```
+
+
+```{r}
+df_totales %>% 
+  select(COD_CANTON, CANTON, Conteo_15_20) %>% 
+  filter(COD_CANTON != 99) %>% 
+  arrange(desc(Conteo_15_20)) %>% 
+  rename(Conteo = 3) #%>% 
+  #head(10)
+```
+
+
+
+### Casos de dengue acumulados de 1993 a 2020
+
+
+```{r}
+# Unión de los datos con las geometrías:
+# Mapa: 
+geo_canton %>% 
+  left_join(
+    y = df_totales %>% select(COD_CANTON, CANTON, Conteo_total), 
+    by = c("COD_UGEC" = "COD_CANTON")
+    ) %>% 
+  ggplot() +
+  geom_sf(aes(fill = Conteo_total, geometry = geometry), color = "gray30", show.legend = T) +
+  coord_sf(xlim = c(230000, 700000), ylim = c(880000, 1241118), expand = FALSE) +
+  labs(
+    fill = "Casos acumulados\n1993-2020" 
+    ) +
+  theme_map() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold")
+    ) +
+  #Paleta de colores: https://pmassicotte.github.io/paletteer_gallery/
+  paletteer::scale_fill_paletteer_c(
+    palette = "ggthemes::Red-Gold",
+    labels = comma_format(),
+    breaks = seq(0, 42000, by = 10000),
+    na.value = "gray"
+    )
+```
+
+```{r}
+df_totales %>% 
+  select(COD_CANTON, CANTON, Conteo_93_12) %>% 
+  filter(COD_CANTON != 99) %>% 
+  arrange(desc(Conteo_93_12)) %>% 
+  rename(Conteo = 3) #%>% 
+  #head(10)
+```
+
+
+
+### Tasa de Incidencia Acumulada (1993 a 2020)
+
+
+```{r}
+# Unión de los datos con las geometrías:
+geo_tasa_93_20 = geo_canton %>% 
+  left_join(
+    y = df_totales %>% select(COD_CANTON, CANTON, Tasa_1993_2020), 
+    by = c("COD_UGEC" = "COD_CANTON")
+  )
+
+# Mapa: 
+geo_tasa_93_20 %>% 
+  ggplot() +
+  geom_sf(aes(fill = Tasa_1993_2020, geometry = geometry), color = "gray30", show.legend = T) +
+  coord_sf(xlim = c(230000, 700000), ylim = c(880000, 1241118), expand = FALSE) +
+  labs(
+    fill = "Tasa\nAcumulada\n1993-2020" 
+    ) +
+  theme_map() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(face = "bold")
+    ) +
+  # Paleta de colores: https://pmassicotte.github.io/paletteer_gallery/
+  paletteer::scale_fill_paletteer_c(
+    palette = "ggthemes::Red-Gold",
+    labels = comma_format(),
+    breaks = seq(0, 45, by = 5),
+    na.value = "gray"
+    )
+```
+
+```{r}
+df_totales %>% 
+  select(COD_CANTON, CANTON, Tasa_1993_2020) %>% 
+  filter(COD_CANTON != 99) %>% 
+  arrange(desc(Tasa_1993_2020)) %>% 
+  rename(Tasa = 3) #%>% 
+  #head(10)
+```
+
+
+
+
+
+
+
+

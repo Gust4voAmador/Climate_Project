@@ -1,0 +1,491 @@
+---
+title: "Análisis inicial del protocolo de Mosquitos de GLOBE-NASA"
+#subtitle: ""
+author: 
+  - name: Iván Daniel Rodríguez Cruz
+    url: https://www.linkedin.com/in/iv%C3%A1n-daniel-rodr%C3%ADguez-cruz-2471a325a/  
+    email: ivan.rodriguezcruz@ucr.ac.cr
+    affiliation: Escuela de Estadística, Universidad de Costa Rica (UCR) - Asistente del Instituto de Investigaciones Sociales (IIS) y del Centro de Investigación en Matemática Pura y Aplicada (CIMPA)
+    corresponding: true
+    
+lang: es  
+date: today
+format: 
+  html:
+    code-fold: false 
+    code-tools: 
+      source: true
+      toggle: true
+    code-link: true
+    page-layout: full
+    title-block-banner: true 
+    toc: true
+    toc-depth: 3
+    toc-title: "Tabla de contenidos"
+    toc_fload: true
+    warning: false
+    message: false
+    df-print: paged
+    reference-location: margin 
+editor: visual
+execute:
+  echo: false
+crossref:
+  chapters: true
+---
+
+# General configuration
+
+## Clean history and environment
+
+```{r}
+# Clean the environment:
+rm(list = ls(all.names = TRUE)) 
+
+# Clear the history of R, but only if in an interactive session:
+clearhistory = function() {
+  if (interactive()) {
+    write("", file = ".blank")
+    loadhistory(".blank")
+    unlink(".blank")
+  }
+}
+
+clearhistory() 
+
+# Scientific notation:
+options(scipen = 999)
+```
+
+## Packages and libraries
+
+First you must install the `pacman::` package to be able to use the following function that downloads and reads packages automatically.
+
+```{r}
+# install.packages("pacman")
+pacman::p_load(
+  tidyverse, haven, readxl, openxlsx, rio, here, ggthemes, scales, sf, rnaturalearth, httr
+)
+```
+
+------------------------------------------------------------------------
+
+# Data
+
+El Mosquito Habitat Mapper en la app GLOBE Observer, lanzado en mayo de 2017, ofrece un protocolo de participación ciudadana enfocado en identificar y mitigar la proliferación de mosquitos en áreas locales.
+
+Lo más destacable es que la identificación de especies por parte de los ciudadanos no es definitiva. Se requiere la validación de científicos, quienes revisan las fotografías de muestra asociadas. Esto plantea una reflexión sobre el equilibrio entre la participación ciudadana y la rigurosidad científica. Por un lado, involucra a la comunidad en la vigilancia y control de vectores, pero por otro, pone de relieve la necesidad de asegurar que los datos sean verificados por expertos para mantener la precisión y relevancia de la información recolectada.
+
+Una posible limitación de esta herramienta es que, aunque promueve la acción preventiva y la recolección de datos en tiempo real, la identificación precisa de especies depende de la calidad de las imágenes y del equipamiento disponible, lo que podría restringir la participación efectiva de algunos usuarios. Además, la app se optimiza para ciertos géneros de mosquitos, lo que podría limitar su aplicabilidad en áreas donde otras especies son más prevalentes.
+
+
+## Variables
+
+```{r}
+library(knitr)
+
+# Crear el dataframe
+data <- data.frame(
+  Variable = c("measurement latitude", "measurement longitude", "measurement elevations", "data source", "water source type", "water source", 
+               "larvae count", "mosquito eggs", "mosquito egg count", "mosquito pupae", "mosquito adults", "last identify stage", 
+               "genus", "species", "breeding ground eliminated", "extra data", "water source photo urls", "larva full body photo urls", 
+               "abdomen closeup photo urls", "comments", "location method", "location accuracy (m)"),
+  `Units / Format` = c("decimal degrees north", "decimal degrees east", "meters (m) above sea level", "n/a", "n/a", "n/a", 
+                       "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "n/a", "meters (m)"),
+  Definition = c("Latitud registrada por el GPS de un participante usando la aplicación GLOBE Observer en el momento de la medición. Rango: [-90,90]. Nota: ver también “latitud”.",
+                 "Longitud registrada por el GPS de un participante usando la aplicación GLOBE Observer en el momento de la medición. Nota: ver también “longitud”.",
+                 "Elevación en la ubicación de latitud/longitud registrada por el GPS de un participante usando la aplicación GLOBE Observer en el momento de la medición. Nota: ver también “elevación”.",
+                 "Indica si los datos fueron ingresados mediante la aplicación GLOBE Observer (actualmente, es la única opción).",
+                 "Clasificación de alto nivel del tipo de hábitat de mosquitos. Opciones: [contenedor: artificial, contenedor: natural, flujo: agua estancada encontrada junto a río o arroyo, estancado: lago/estanque/pantano].",
+                 "Clasificación adicional del tipo de hábitat de mosquitos. Opciones: [lata, botella, estanque, cisterna].",
+                 "Número (entero) de larvas de mosquito presentes.",
+                 "¿Hay huevos de mosquitos presentes? Opciones: [VERDADERO, FALSO].",
+                 "Este campo actualmente no se utiliza.",
+                 "¿Hay pupas de mosquito presentes? Opciones: [VERDADERO (t), FALSO (f)].",
+                 "¿Hay mosquitos adultos presentes? Opciones: [VERDADERO (t), FALSO (f)].",
+                 "Indicador de la última etapa de identificación que completó un usuario en la herramienta Mosquito Habitat Mapper de la aplicación móvil GLOBE Observer.",
+                 "Género de los mosquitos. Opciones: [Aedes, Anopheles, Culex]. Nota: estos son datos no validados enviados por científicos ciudadanos y deberían ser validados por científicos a través de la examinación de fotografías asociadas.",
+                 "Especie de los mosquitos (e.g., aegypti, albopictus). Nota: estos son datos no validados enviados por científicos ciudadanos y deberían ser validados por científicos a través de la examinación de fotografías asociadas.",
+                 "¿Fue eliminado el lugar de cría? Opciones: [VERDADERO (t), FALSO (f)].",
+                 "Entrada opcional si el usuario desea reportar la presencia de una especie de mosquito que no es parte de las opciones en la aplicación móvil GLOBE Observer.",
+                 "URL de la foto de la fuente de agua de los mosquitos.",
+                 "URL de la foto completa del cuerpo de la larva de mosquito.",
+                 "URL para la foto del abdomen del mosquito.",
+                 "Comentarios sobre la observación del mosquito.",
+                 "Indica si la ubicación de la medición fue determinada automáticamente por el GPS del dispositivo o ingresada manualmente.",
+                 "Para ubicaciones determinadas por el GPS del dispositivo, esta es la estimación de precisión dentro de 'n' metros.")
+)
+
+# Mostrar la tabla
+kable(data, format = "html", table.attr = "class='table table-striped'")
+```
+
+
+
+
+```{r}
+df1 = read_excel(
+  path = here("2. Data", "Mosquito_Habitat_Mapper_GLOBE_Measurement.xlsx"), 
+  sheet = 2
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(
+        organization_id, site_id, latitude, longitude,
+        measurement_latitude, measurement_longitude, measurement_elevation, 
+        location_accuracy
+        ), 
+      .fns = as.numeric
+      )
+    ) %>% 
+  mutate(
+    measured_on = ymd(measured_on) # Formato: año-mes-día
+    )
+
+# Ver la base de datos: 
+df1
+```
+
+## Modificar la variable `larvae_count`
+
+Nota: hay que fijarse bien la variabe de `larvae_count` porque debe ser numérica, pero originalmente ponen observaciones como: more than 100, 1-25, etc.
+
+```{r}
+df1 %>% 
+  select(larvae_count) %>% 
+  group_by(larvae_count) %>% 
+  count()
+```
+
+## Mapa general
+
+```{r}
+# Base de datos de latitud y longitud: 
+df1_coor = df1 %>% 
+  select(longitude, latitude) %>% 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# Mapa mundial:
+#world = rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+world = map_data("world")
+
+# Gráfico del mapa:
+ggplot() +
+  # Añadir la capa del mapa mundial:
+  # geom_sf(
+  #   data = world, 
+  #   fill = "gray85", 
+  #   color = "black"
+  #   ) +
+  geom_polygon(
+    data = world, 
+    mapping = aes(x = long, y = lat, group = group), 
+    fill = "gray85", 
+    color = "black"
+    ) + 
+  # Añadir los puntos de las coordenadas de la base de datos de Mosquitos:
+  geom_sf(
+    data = df1_coor, 
+    color = "tomato", 
+    size = 0.8
+    ) +
+  theme_minimal() +
+  labs(
+    x = "Longitud", 
+    y = "Latitud"
+    )
+```
+
+## Mapa de Latinoamérica
+
+```{r}
+# Cargar datos de países de Latinoamérica
+latam <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  filter(region_un == "Americas" & subregion != "Northern America")
+
+# Verificar el CRS de latam
+# st_crs(latam)
+
+# Convertir df1 a un objeto sf (con CRS 4326)
+puntos <- df1 %>%
+  select(longitude, latitude, elevation) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# Asegurarse de que latam y puntos tienen el mismo CRS
+if (st_crs(puntos) != st_crs(latam)) {
+  latam <- st_transform(latam, crs = st_crs(puntos))
+}
+
+# Identificar puntos en Latinoamérica usando st_intersects, sin filtrar
+system.time({
+  interseccion <- st_intersects(puntos, latam)
+  
+  # Crear una columna que indique si el punto está en Latinoamérica
+  puntos <- puntos %>%
+    mutate(en_latam = lengths(interseccion) > 0)
+})
+
+# Crear el gráfico de puntos en Latinoamérica
+mapa = ggplot() +
+  geom_sf(data = latam, fill = "gray85", color = "black") +
+  geom_sf(
+    data = puntos %>% filter(en_latam), 
+    color = "red", 
+    size = 1
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Mosquito breeding sites in Latin America",
+    subtitle = str_glue("Total mosquito breeding sites: {sum(puntos$en_latam)}"),
+    caption = "Source: Authors using data from the GLOBE Mosquito Habitat Mapper (MHM) protocol."
+    ) +
+  theme(
+    plot.title = element_text(hjust = 0, face = "bold"),
+    plot.subtitle = element_text(hjust = 0),
+    plot.caption = element_text(hjust = 0)
+    )
+
+# Mostrar el gráfico
+mapa
+
+# Si quieres guardar el gráfico, descomenta la siguiente línea:
+# ggsave("puntos_latinoamerica.png", mapa, width = 12, height = 8, dpi = 300)
+
+# Añadir la información de vuelta a df1 (manteniendo la longitud correcta)
+df1 <- df1 %>%
+  mutate(en_latam = puntos$en_latam)
+
+# Ver un resumen de df1
+df1 %>%
+  summarise(
+    total_puntos = n(),
+    across(en_latam, list(
+      puntos = ~sum(.x, na.rm = TRUE),
+      porcentaje = ~mean(.x, na.rm = TRUE) * 100
+    ), .names = "{.fn}_en_latam")
+  ) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+```
+
+
+## Hábitat de los mosquitos 
+
+```{r}
+df1 %>% 
+  mutate(`water_source` = recode(`water_source`, 
+                         "swamp or wetland" = "Pantano o humedal", 
+                         "can or bottle" = "Lata o botella", 
+                         "plant clumps (bamboo etc)" = "Grupo plantas", 
+                         "flower or plant pot/tray" = "Maceta", 
+                         "ditch" = "Zanja", 
+                         "tire" = "Neumático", 
+                         "other" = "Otro", 
+                         "cement, metal or plastic tank" = "Tanque", 
+                         "puddle, vehhicle or animal tracks" = "Charcos y huellas", 
+                         "dish or pot" = "Plato o olla", 
+                         "plant husk (areca, coconut etc)" = "Cáscara planta", 
+                         "trash container" = "Basurero", 
+                         "fountain or bird bath" = "Fuente", 
+                         "well or cistern" = "Pozo o cisterna", 
+                         "jar" = "Frasco", 
+                         "pond" = "Estanque", 
+                         "tree holes" = "Huecos en árboles", 
+                         "puddle or still water next to a creek, stream or river" = "Charca junto a río", 
+                         "reservoir" = "Reservorio", 
+                         "grill or outdoor appliance" = "Parrilla", 
+                         "discarded: other" = "Desecho: otro", 
+                         "animal shell (tortoise, mollusk etc)" = "Caparazón animal", 
+                         "pool" = "Piscina", 
+                         "animal trough or water bowl" = "Bebedero", 
+                         "estuary" = "Estuario", 
+                         "puddle, vehicle or animal tracks" = "Charcos y huellas", 
+                         "ovitrap" = "Ovitrap", 
+                         "rain gutter or other architectural feature" = "Canalón", 
+                         "lake" = "Lago", 
+                         "adult mosquito trap" = "Trampa mosquitos", 
+                         "old car or boat" = "Auto/barco viejo", 
+                         "public works - culvert, bridge, road" = "Obras públicas", 
+                         "bay or ocean" = "Bahía u océano", 
+                         "refrigerator drainage" = "Drenaje refrigerador"
+                         )) %>% 
+  group_by(water_source) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  ggplot(aes(x = reorder(water_source, Total, decreasing = T), y = Total)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Total), vjust = -0.2, size = 3) +
+  labs(
+    title = "Top 10 criaderos de mosquitos con mayor cantidad de casos registrados",
+    y = "Total",
+    x = NULL
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+## Clasificación de alto nivel del tipo de hábitat del mosquito
+
+
+```{r}
+df1 %>% 
+  mutate(water_source_type = recode(water_source_type, 
+                         "still: lake/pond/swamp" = "Pantano/humedal", 
+                         "container: natural" = "Cont.natural", 
+                         "container: artificial" = "Cont. artificial", 
+                         "flowing: still water found next to river or stream" = "Agua estancada de rio/arroyo", )) %>% 
+  group_by(water_source_type) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  ggplot(aes(x = reorder(water_source_type, Total, decreasing = T), y = Total)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::comma(Total)), vjust = -0.5, size = 3.5) +
+  labs(
+    title = "Cantidad de observaciones por tipo general de criadero de mosquito",
+    y = "Total",
+    x = NULL
+  ) +
+  theme_minimal() +
+  scale_y_continuous(
+    labels = comma_format()
+  )
+```
+
+
+## Registros con pupas
+
+```{r}
+df1 %>% 
+  group_by(mosquito_pupae) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  ggplot(aes(x = reorder(mosquito_pupae, Total, decreasing = T), y = Total)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::comma(Total)), vjust = -0.5, size = 3.5) +
+  labs(
+    title = "Registros con pupas",
+    y = "Total",
+    x = NULL
+  ) +
+  theme_minimal() +
+  scale_y_continuous(
+    labels = comma_format()
+  )
+```
+
+## Registros con huevos de mosquitos
+
+```{r}
+df1 %>% 
+  group_by(mosquito_eggs) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  ggplot(aes(x = reorder(mosquito_eggs, Total, decreasing = F), y = Total)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::comma(Total)), vjust = -0.5, size = 3.5) +
+  labs(
+    title = "Registros con huevos de mosquitos",
+    y = "Total",
+    x = NULL
+  ) +
+  theme_minimal() +
+  scale_y_continuous(
+    labels = comma_format()
+  )
+```
+
+
+## Género de los mosquitos
+
+```{r}
+df1 %>% 
+  group_by(genus) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  na.omit() %>% 
+  ggplot(aes(x = reorder(genus, Total, decreasing = F), y = Total, fill = genus)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = scales::comma(Total)), vjust = -0.5, size = 3.5) +
+  labs(
+    title = "Cantidad de observaciones por género del mosquito",
+    subtitle = "Se omitieron los valores vacíos NA (39,373)",
+    y = "Total",
+    x = NULL,
+    fill = "Género"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(
+    labels = comma_format()
+  )
+```
+
+
+## Adultez de los mosquitos 
+
+```{r}
+df1 %>% 
+  group_by(mosquito_adults) %>% 
+  summarise(
+    Total = n()
+  ) %>% 
+  arrange(desc(Total)) %>% 
+  head(10) %>% 
+  na.omit() %>% 
+  mutate(
+    mosquito_adults = case_when(
+      mosquito_adults == TRUE ~ "Sí, es adulto",
+      TRUE ~ "No es adulto"
+    )
+  ) %>% 
+  ggplot(aes(x = reorder(mosquito_adults, Total, decreasing = F), y = Total, fill = mosquito_adults)) +
+  geom_bar(stat = "identity", show.legend = F) +
+  geom_text(aes(label = scales::comma(Total)), vjust = -0.5, size = 3.5) +
+  labs(
+    title = "Cantidad de observaciones por género del mosquito",
+    subtitle = "Se omitieron los valores vacíos NA (26,487)",
+    y = "Total",
+    x = NULL,
+    fill = "Género"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(
+    labels = comma_format()
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------------------
+
+## Save data
+
+```{r}
+save(df1, file = here("2. Data", "data_MHM_clean.Rdata"))
+```

@@ -1,0 +1,7 @@
+"0","# install.packages(""pacman"")"
+"0","pacman::p_load("
+"0","  tidyverse, haven, readxl, openxlsx, rio, here, ggthemes, scales, sf, sjmisc, mice"
+"0",")"
+"0",""
+"0","# Leer las geometrías de los mapas de los cantones:"
+"0","geo_canton = read_sf(here(""2. Data/MAPAS/UGEC_MGN_2022"", ""UGEC_MGN_2022.shp""))"

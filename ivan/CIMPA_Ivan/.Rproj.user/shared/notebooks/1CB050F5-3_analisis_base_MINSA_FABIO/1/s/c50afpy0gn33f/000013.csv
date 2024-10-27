@@ -1,0 +1,5 @@
+"0","df1 %>%"
+"0","  summarise(across(everything(), ~ sum(is.na(.)))) %>%"
+"0","  pivot_longer(cols = everything(), names_to = ""Variable"", values_to = ""cantidad_NA"") %>% "
+"0","  mutate(Prop_total = (cantidad_NA / nrow(df1) * 100) %>% round(2)) %>% "
+"0","  arrange(desc(cantidad_NA))"

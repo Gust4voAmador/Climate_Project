@@ -1,0 +1,1 @@
+"0","df1 %>% select(EANOS_grupos) %>% sjmisc::frq(out = ""viewer"")"
