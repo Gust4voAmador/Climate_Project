@@ -78,7 +78,6 @@ Lo más destacable es que la identificación de especies por parte de los ciudad
 
 Una posible limitación de esta herramienta es que, aunque promueve la acción preventiva y la recolección de datos en tiempo real, la identificación precisa de especies depende de la calidad de las imágenes y del equipamiento disponible, lo que podría restringir la participación efectiva de algunos usuarios. Además, la app se optimiza para ciertos géneros de mosquitos, lo que podría limitar su aplicabilidad en áreas donde otras especies son más prevalentes.
 
-
 ## Variables
 
 ```{r}
@@ -119,9 +118,6 @@ data <- data.frame(
 # Mostrar la tabla
 kable(data, format = "html", table.attr = "class='table table-striped'")
 ```
-
-
-
 
 ```{r}
 df1 = read_excel(
@@ -268,8 +264,7 @@ df1 %>%
   mutate(across(where(is.numeric), ~ round(.x, 2)))
 ```
 
-
-## Hábitat de los mosquitos 
+## Hábitat de los mosquitos
 
 ```{r}
 df1 %>% 
@@ -330,7 +325,6 @@ df1 %>%
 
 ## Clasificación de alto nivel del tipo de hábitat del mosquito
 
-
 ```{r}
 df1 %>% 
   mutate(water_source_type = recode(water_source_type, 
@@ -357,7 +351,6 @@ df1 %>%
     labels = comma_format()
   )
 ```
-
 
 ## Registros con pupas
 
@@ -407,7 +400,6 @@ df1 %>%
   )
 ```
 
-
 ## Género de los mosquitos
 
 ```{r}
@@ -435,8 +427,7 @@ df1 %>%
   )
 ```
 
-
-## Adultez de los mosquitos 
+## Adultez de los mosquitos
 
 ```{r}
 df1 %>% 
@@ -468,4 +459,3 @@ df1 %>%
     labels = comma_format()
   )
 ```
-

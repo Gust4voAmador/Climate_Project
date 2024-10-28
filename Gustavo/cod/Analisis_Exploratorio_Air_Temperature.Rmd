@@ -1,0 +1,276 @@
+---
+title: "Análisis exploratorio del protocolo de temperatura del aire de GLOBE-NASA"
+author:
+  - name: Gustavo Alberto Amador Fonseca
+    email: gustavo.amadorfonseca@ucr.ac.cr
+    affiliation: Escuela de Matemática, Universidad de Costa Rica (UCR) - Asistente del Centro de Investigación en Matemática Pura y Aplicada (CIMPA)
+    corresponding: true
+date: "2024-10-26"
+output: 
+  distill::distill_article:
+    toc: true
+    toc_depth: 2
+    code_folding: show
+
+---
+
+```{r, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+# Cargando una librería para utilizar funciones específicas
+library(leaflet)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(corrplot)
+library(hms)
+
+data_ori <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/ASISTENCIA/Fabio Sánchez/Climate_Project/Gustavo/data/Air_temperature/GLOBEMeasurementData-22014.csv")
+#View(data_ori)
+
+```
+
+# Data
+
+El conjunto de datos corresponde a las mediciones recopiladas a través del programa GLOBE, el cual permite la participación de diferentes escuelas y organizaciones desde 1996. Este enfoque de participación ciudadana busca promover la observación del ambiente a través del registro de datos sobre condiciones climáticas y variables ambientales, tales como la temperatura del aire y la elevación de los sitios de medición. En este caso, se ha tomado una muestra que considera exclusivamente las observaciones provenientes de Costa Rica y Panamá, lo cual permite un enfoque más local.
+
+Un aspecto importante de estos datos es la inclusión de mediciones realizadas por miembros de la comunidad, lo cual permite una cobertura amplia de la recolección de datos en diferentes lugares. Sin embargo, los datos deben ser cuidadosamente validados, ya que la precisión puede variar considerablemente dependiendo del tipo de equipo utilizado y la experiencia de los participantes. Además, la calidad de algunos campos como comments o globe teams no está completamente documentada, lo que podría dificultar algunos tipos de análisis.
+
+## Variables
+
+| Variable                      | Units/Format           | Definition |
+|------------------------------ |------------------------|---------------------------------------------------------------|
+| `organization_id`             | text                   | Identificador de la organización participante en el programa GLOBE. |
+| `org_name`                    | text                   | Nombre de la organización participante en el programa GLOBE. |
+| `site_id`                     | text                   | Identificador del sitio donde se realizó la medición. |
+| `site_name`                   | text                   | Nombre del sitio donde se realizó la medición. |
+| `latitude`                    | decimal degrees north  | Latitud registrada por GPS en el lugar de la medición. |
+| `longitude`                   | decimal degrees east   | Longitud registrada por GPS en el lugar de la medición. |
+| `elevation`                   | meters above sea level | Elevación del sitio donde se realizaron las mediciones. |
+| `measured_on`                 | Date (YYYY-MM-DD)      | Fecha en la que se realizaron las mediciones. |
+| `air temps:userid`            | numeric ID             | Identificador del usuario que realizó la medición de la temperatura del aire. |
+| `air temps:measured at`       | DateTime (YYYY-MM-DD HH:MM:SS) | Fecha y hora exacta en la que se realizó la medición del aire. |
+| `air temps:solar measured at` | DateTime (YYYY-MM-DD HH:MM:SS) | Fecha y hora exacta de la medición solar. |
+| `air temps:current temp (deg C)` | degrees Celsius     | Temperatura actual medida en grados Celsius. |
+| `air temps:comments`          | text                   | Comentarios sobre las mediciones de temperatura del aire. |
+| `air temps:globe teams`       | text                   | Equipos participantes en el programa GLOBE que realizaron las mediciones. |
+
+
+Estas variables permiten realizar un análisis espacial y temporal de las condiciones climáticas en los sitios seleccionados, lo cual es de gran utilidad para estudios ambientales que requieran correlacionar variables geográficas con los patrones de temperatura observados.
+
+
+# Proceso de Limpieza de Datos
+
+1. **Eliminación de la primera observación**: Se eliminó la primera observación del conjunto de datos, ya que no aportaba información relevante.
+
+2. **Renombrado de columnas**: Se cambiaron los nombres de algunas columnas para hacerlas más fáciles de manejar, por ejemplo, `air temps:userid` se renombró a `userid`.
+
+3. **Eliminación de columnas no relevantes**: Se eliminaron las columnas `air temps:comments`, `air temps:globe teams`, entre otras, ya que no aportaban información útil para el análisis.
+
+4. **Conversión de columnas a tipo numérico**: Las columnas `latitude`, `longitude` y `elevation` se convirtieron a formato numérico para facilitar el análisis.
+
+5. **Separación de columnas de fecha y hora**: Las columnas que contenían fecha y hora juntas (`measured_at` y `solar_measured_at`) fueron separadas en columnas independientes de fecha y hora para un análisis más detallado.
+
+
+
+```{r, echo=FALSE, message=FALSE}
+# Elimiinar primer observación que no sirve
+data_clea <- data_ori[-1, ]
+
+#Cambiar nombre de columnas
+data_clea <- data_clea %>% rename("userid" = "air temps:userid", "measured_at" = "air temps:measured at","solar_measured_at" = "air temps:solar measured at", "current_temp_C" = "air temps:current temp (deg C)")
+
+# Eliminar columnas que no aportan información
+data_clea <- data_clea %>% select(- "air temps:comments", -"air temps:globe teams")
+
+# Convertir a numericas las columnas que lo deben ser
+cols_numericas <- c("latitude", "longitude", "elevation")  # Especifica los nombres de las columnas
+data_clea[cols_numericas] <- lapply(data_clea[cols_numericas], as.numeric)
+
+# Separar columnas que tiene fecha y hora juntas
+data_clea$fecha_measured_at <- as.Date(data_clea$`measured_at`) # Crear columna de fecha
+data_clea$`hora_measured_at` <- format(data_clea$`measured_at`, format = "%H:%M:%S") # Crear columna de hora
+
+data_clea$`fecha_solar_measured_at` <- as.Date(data_clea$`solar_measured_at`) # Crear columna de fecha
+data_clea$`hora_solar_measured_at` <- format(data_clea$`solar_measured_at`, format = "%H:%M:%S") # Crear columna de hora
+
+
+#head(data_clea)
+#View(data_clea)
+```
+
+
+# Análisis exploratorio de variables
+
+## Ubicación geográfica de la toma de datos
+
+Visualizar la distribución espacial de los puntos de recolección de datos y explorar su ubicación geográfica de una manera interactiva.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Hacer las columnas de longitud y latitud son numéricas
+data_ori$longitude <- as.numeric(data_ori$longitude)
+data_ori$latitude <- as.numeric(data_ori$latitude)
+
+# Crear un mapa interactivo
+leaflet(data_ori) %>%
+  addTiles() %>%  # Mapa base
+  addCircles(
+    lng = ~longitude, 
+    lat = ~latitude, 
+    color = "blue",  # Color de los círculos
+    radius = 50,  # Ajusta el tamaño del círculo según sea necesario
+    fillOpacity = 0.5,
+    stroke = FALSE
+  ) %>%
+  addLegend("bottomright", 
+            pal = colorNumeric(palette = "blue", domain = data_ori$longitude),  
+            values = data_clea$longitude,  
+            title = "Puntos")
+```
+
+## Historgrama de la variable Elevación `elevation`
+```{r, echo=FALSE, warning=FALSE}
+
+# Filtrar datos para que solo incluya elevaciones mayores que 0
+data_filtered <- data_clea[as.numeric(data_clea$elevation) > 0, ]
+
+# Crear un histograma usando ggplot con ancho de barra de 250
+ggplot(data_filtered, aes(x = elevation)) + 
+  geom_histogram(binwidth = 250, fill = "blue", color = "black") +  # Ancho de barra ajustado a 500
+  labs(title = "Histograma de Elevación (Valores Positivos)", 
+       x = "Elevación", 
+       y = "Frecuencia") +
+  scale_x_continuous(breaks = seq(0, max(data_filtered$elevation, na.rm = TRUE), by = 250)) +  # Establecer los breaks en el eje x
+  theme_minimal()  # Estilo minimalista
+
+```
+<p> La distribución del histograma muestra una gran concentración de mediciones de elevación cerca de cero, con una gran cantidad de valores menores a 250 metros sobre el nivel del mar. Esto podría indicar la presencia de datos erróneos o problemas de calidad en la recolección de las elevaciones, especialmente considerando que algunas de las ubicaciones donde se tomaron las muestras no deberían tener elevaciones tan bajas o negativas. Además, existe una agrupación más pequeña de valores alrededor de 1250 metros, lo cual sugiere una posible segmentación en la muestra que podría deberse a diferentes tipos de terreno o zonas geográficas.</p>
+
+
+## Histograma de la variable temperatura del aire (grados Celsius) `current_temp_C`
+```{r, echo=FALSE, warning=FALSE}
+# Convertir la columna a numérica si es necesario
+data_clea$current_temp_C <- as.numeric(as.character(data_clea$current_temp_C))
+
+# Crear el histograma con ancho de barra de 1
+ggplot(data_clea, aes(x = current_temp_C)) + 
+  geom_histogram(binwidth = 1, fill = "blue", color = "black") +  # Ancho de barra ajustado a 1
+  labs(title = "Histograma Temperatura del Aire", 
+       x = "Temperatura (°C)", 
+       y = "Frecuencia") +
+  theme_minimal()  # Estilo minimalista
+
+
+```
+
+El histograma de la temperatura del aire muestra una distribución asimétrica con mayor densidad entre 28-32 °C. Hay un sesgo hacia la derecha, con menos frecuencias a temperaturas superiores a 35 °C e inferiores a 20 °C. Es necesario explorar cómo factores como la ubicación geográfica y la temporalidad afectan estas variaciones de temperatura.
+
+
+## Historgrama de la variable hora de la medición solar `hora_solar_measured_at`
+```{r, echo=FALSE, warning=FALSE}
+# Cambiar formato de la varibale hora, a uno adecuado para graficar
+data_clea$hora_solar_measured_at <- hms::as_hms(data_clea$hora_solar_measured_at)
+
+ggplot(data_clea, aes(x = hora_solar_measured_at)) + 
+  geom_histogram(binwidth = 15*60, fill = "blue", color = "black") +  # Ancho de barra de 1 hora
+  labs(title = "Frecuencia de Mediciones por Hora", 
+       x = "Hora del día", 
+       y = "Frecuencia") +
+  theme_minimal()
+
+
+```
+<p>Se toman intervalos de 15 minutos para graficas la distribución de las horas del día. El histograma muestra una alta concentración de mediciones alrededor de las 10:00 AM, indicando un sesgo claro hacia esa hora específica. Esto sugiere que la mayoría de las observaciones se realizan en una franja horaria limitada, posiblemente debido a preferencias en los horarios de trabajo de los recolectores o condiciones específicas del estudio. Se recomienda evaluar si este patrón introduce sesgos en el análisis general.</p>
+
+
+
+## Historgrama de la variable fecha de medicion `fecha_measured_at`
+```{r, echo=FALSE, warning=FALSE}
+# Graficar la frecuencia de observaciones por fecha
+ggplot(data_clea, aes(x = fecha_measured_at)) + 
+  geom_histogram(binwidth = 30, fill = "blue", color = "black") +  # Cada barra representa 1 día
+  labs(title = "Frecuencia de Observaciones por Fecha", 
+       x = "Fecha", 
+       y = "Frecuencia") +
+  theme_minimal()
+
+```
+<p>Para graficar el historgrama se tomaron intervalos de 30 días,para poder observar la densidad de la toma de datos.</p>
+
+1. **Concentración antes de 2010**: Alta frecuencia de observaciones, posiblemente por una campaña específica.
+
+2. **Disminución después de 2010**: Reducción drástica de datos, indicando menor actividad o cambios en el proyecto.
+
+3. **Pico en 2023**: Un gran aumento reciente de observaciones, que sería una carga masiva de datos.
+
+
+
+# Matriz de correlación entre las variables `elevation`, `latitude`, `longitude`, `current_temp_C`, `hora_solar_decimal`
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Convertir las variables hora a formato hms
+data_clea$hora_solar_measured_at <- hms::as_hms(data_clea$solar_measured_at)
+
+# Convertir la variable hora a decimales
+data_clea$hora_solar_decimal <- as.numeric(data_clea$hora_solar_measured_at) / 3600
+
+# Seleccionar las columnas para la matriz de correlación, sin incluir `hora_measured_decimal`
+cor_data <- data_clea[, c("elevation", "latitude", "longitude", "current_temp_C", "hora_solar_decimal")]
+
+# La matriz de correlación
+cor_matrix <- cor(cor_data, use = "complete.obs")
+```
+
+
+
+|                     | elevation    | latitude    | longitude    | current_temp_C | hora_solar_decimal |
+|---------------------|--------------|-------------|--------------|----------------|---------------------|
+| **elevation**       | 1.00000000   | 0.47949065  | -0.48547958  | -0.52955432    | 0.06505916          |
+| **latitude**        | 0.47949065   | 1.00000000  | -0.78040997  | -0.34113489    | 0.06580582          |
+| **longitude**       | -0.48547958  | -0.78040997 | 1.00000000   | 0.06611810     | -0.02821455         |
+| **current_temp_C**  | -0.52955432  | -0.34113489 | 0.06611810   | 1.00000000     | -0.07034716         |
+| **hora_solar_decimal** | 0.06505916 | 0.06580582 | -0.02821455 | -0.07034716    | 1.00000000          |
+
+
+
+```{r, echo=FALSE}
+# Visualizar la matriz de correlación
+corrplot(cor_matrix, method = "color", type = "upper", tl.col = "black", tl.srt = 45)
+```
+## Observaciones sobre la Matriz de Correlación
+
+La matriz de correlación, junto con el mapa de calor generado, muestra la relación entre diferentes variables ambientales recopiladas en el conjunto de datos. Algunas observaciones destacadas son:
+
+1. **Correlación Elevación y Latitude**: Existe una correlación moderada positiva (0.48) entre la elevación y la latitud. Esto indica que a medida que la latitud aumenta, la elevación también tiende a incrementarse, lo cual puede estar relacionado con las características geográficas de la región estudiada.
+
+2. **Correlación Elevación y Temperatura Actual**: Hay una correlación negativa moderada (-0.53) entre la elevación y la temperatura del aire. Esto sugiere que a mayores elevaciones, la temperatura tiende a ser menor, lo cual es consistente con el comportamiento climático general, donde a mayores altitudes se observan temperaturas más bajas.
+
+3. **Correlación Latitude y Longitude**: Se observa una correlación negativa fuerte (-0.78) entre la latitud y la longitud, lo cual podría reflejar la distribución específica de los puntos de medición en Costa Rica y Panamá.
+
+4. **Temperatura Actual y Hora Solar Decimal**: Existe una correlación leve negativa (-0.07) entre la temperatura actual y la hora solar decimal. Esta relación sugiere que, aunque hay una variación en la temperatura a lo largo del día, el impacto es relativamente débil en el conjunto de datos analizado.
+
+5. **Correlación Latitude y Hora Solar Decimal**: La correlación entre la latitud y la hora solar decimal es muy baja (0.07), indicando que no existe una relación lineal significativa entre estas variables en el contexto de este conjunto de datos.
+
+En general, estas correlaciones nos permiten entender mejor las relaciones entre las variables ambientales, como la influencia de la elevación y la latitud sobre la temperatura. Sin embargo, es importante tener en cuenta que la correlación no implica causalidad, y otros factores podrían estar influyendo en estas relaciones.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

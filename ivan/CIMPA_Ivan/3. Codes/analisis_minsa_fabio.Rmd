@@ -71,59 +71,57 @@ pacman::p_load(
 geo_canton = read_sf(here("2. Data/MAPAS/UGEC_MGN_2022", "UGEC_MGN_2022.shp"))
 ```
 
-
----
+------------------------------------------------------------------------
 
 # BASE DE DATOS DE LA DRA. ADRIANA TROYO
 
-Esta es la base de datos que proporcionó la investigadora Dra. Adriana Troyo de la Facultad de Microbiología. 
+Esta es la base de datos que proporcionó la investigadora Dra. Adriana Troyo de la Facultad de Microbiología.
 
 ```{r}
 df1 = read.csv(file = here("2. Data", "base_MINSA.csv"), sep = ";")
 df1 = df1 %>% mutate(FIS = dmy(FIS))
 ```
 
-
 ## Variables
 
-La base de datos incluye las siguientes variables. Es importante destacar que aquellas marcadas con un (*) son variables que requieren recodificación, pero esta debe realizarse bajo supervisión. Adicionalmente, hay algunas variables cuya definición no es clara, y están indicadas con un (?). Por lo tanto, las variables que conforman la base de datos son las siguientes:
+La base de datos incluye las siguientes variables. Es importante destacar que aquellas marcadas con un (\*) son variables que requieren recodificación, pero esta debe realizarse bajo supervisión. Adicionalmente, hay algunas variables cuya definición no es clara, y están indicadas con un (?). Por lo tanto, las variables que conforman la base de datos son las siguientes:
 
-1.   CONSECUTIVO.UIS: Identificador único asociado a...
-2.   AREA: Área de salud del MINSA.
-3.   FIS: ?
-4.   SEFIS: ?
-5.   DXN: Tipo de enfermedad sin codificar. 
-6.   FDX: ?
-7.   SEDX: 
-8.   DXW: ?
-9.   SEXO: Sexo de la persona.
-10.  EMBARAZO: Tiene o no embarazo (mujeres). 
-11.  HOSP: ?
-12.  ETNIA: Grupo étnico. 
-13.  EANOS: Edad en años cumplidos.
-14.  EMESES: Mes?
-15.  EDIAS: Días?
-16.  NAC: Nacionalidad de la persona.*
-17.  OCUP: Ocupación de la persona.*
-18.  PROV: Provincia.*
-19.  COD_PROV: Código de la provincia.
-20.  PROVINCIA: Provincia recodificada.
-21.  CANT: Cantón. 
-22.  COD_CANT: Código del cantón.
-23.  DIST: Distrito.
-24.  COD_DIST: Código del distrito.
-25.  LTRABAJO: Lugar de trabajo.*
-26.  PROV.1: Provincia (mal codificada).
-27.  CANT.1: Cantón (mal codificada).
-28.  EINFORME: ?
-29.  FTM: ?
-30.  RLAB: Resultado de laboratorio.* 
-31.  FINVEST: ?
-32.  DXFINAL: Tipo de dengue detectado (codificación final MINSA).
-33.  CLASIFICACION: Clasificación de la prueba de laborario.*
-34.  REGION: Región MINSA.
-35.  UIS: ?
-36.  AÑO: Año de la observación. 
+1.  CONSECUTIVO.UIS: Identificador único asociado a...
+2.  AREA: Área de salud del MINSA.
+3.  FIS: ?
+4.  SEFIS: ?
+5.  DXN: Tipo de enfermedad sin codificar.
+6.  FDX: ?
+7.  SEDX:
+8.  DXW: ?
+9.  SEXO: Sexo de la persona.
+10. EMBARAZO: Tiene o no embarazo (mujeres).
+11. HOSP: ?
+12. ETNIA: Grupo étnico.
+13. EANOS: Edad en años cumplidos.
+14. EMESES: Mes?
+15. EDIAS: Días?
+16. NAC: Nacionalidad de la persona.\*
+17. OCUP: Ocupación de la persona.\*
+18. PROV: Provincia.\*
+19. COD_PROV: Código de la provincia.
+20. PROVINCIA: Provincia recodificada.
+21. CANT: Cantón.
+22. COD_CANT: Código del cantón.
+23. DIST: Distrito.
+24. COD_DIST: Código del distrito.
+25. LTRABAJO: Lugar de trabajo.\*
+26. PROV.1: Provincia (mal codificada).
+27. CANT.1: Cantón (mal codificada).
+28. EINFORME: ?
+29. FTM: ?
+30. RLAB: Resultado de laboratorio.\*
+31. FINVEST: ?
+32. DXFINAL: Tipo de dengue detectado (codificación final MINSA).
+33. CLASIFICACION: Clasificación de la prueba de laborario.\*
+34. REGION: Región MINSA.
+35. UIS: ?
+36. AÑO: Año de la observación.
 
 ```{r}
 df1 = df1 %>%
@@ -224,19 +222,17 @@ df1 = df1 %>%
       right = FALSE  # Define los intervalos como [0, 5), [5, 10), etc.
     )
   )
-``` 
-
+```
 
 Sin embargo, las variables marcadas con un (?) corresponden a aquellas cuyo significado o propósito no está del todo claro dado que no se contiene un diccionario previo de las variables. Por ello, es fundamental contar con el acompañamiento de una persona experta que conozca la base de datos o el tema en cuestión, para poder realizar los ajustes necesarios en las variables de interés para el estudio.
 
-
----
+------------------------------------------------------------------------
 
 # Análisis inicial
 
 ## Tamaño de la base de datos
 
-Esta base de datos cuenta, de forma inicial, con 153,815 observaciones y 37 variables. 
+Esta base de datos cuenta, de forma inicial, con 153,815 observaciones y 37 variables.
 
 ```{r}
 df1 %>% dim
@@ -256,7 +252,7 @@ df1 %>%
 
 ## Frecuencia de ciertas variables
 
-### Año 
+### Año
 
 Cerca del 30% de toda la información está disponible para el año 2013.
 
@@ -278,31 +274,27 @@ df1 %>%
   theme_minimal()
 ```
 
-
-### Tipo de dengue*
+### Tipo de dengue\*
 
 ```{r}
 df1 %>% select(DXFINAL) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
 ```
 
-
 ### Sexo
 
-Prácticamente, hay paridad entre los sexos. 
+Prácticamente, hay paridad entre los sexos.
 
 ```{r}
 df1 %>% select(SEXO) %>% sjmisc::frq(out = "viewer")
 ```
 
-
 ### Grupo de años (quinquenales)
 
-Los grupos de edad de 15-19, 20-24 y 25-29 son los que contienen mayor cantidad de información. 
+Los grupos de edad de 15-19, 20-24 y 25-29 son los que contienen mayor cantidad de información.
 
 ```{r}
 df1 %>% select(EANOS_grupos) %>% sjmisc::frq(out = "viewer")
 ```
-
 
 ### Región Minsa
 
@@ -310,23 +302,19 @@ df1 %>% select(EANOS_grupos) %>% sjmisc::frq(out = "viewer")
 df1 %>% select(REGION) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
 ```
 
-
 ### Provincia
 
-Las provincias de Limón y Puntarenas son las que poseen un mayor número de casos registrados. 
+Las provincias de Limón y Puntarenas son las que poseen un mayor número de casos registrados.
 
 ```{r}
 df1 %>% select(PROVINCIA) %>% sjmisc::frq(out = "viewer", sort.frq = "desc")
 ```
 
-
----
+------------------------------------------------------------------------
 
 # BASE DE DATOS DENGUE FABIO
 
-
-Esta es la base de datos que brindó acceso el Dr. Fabio Sánchez y corresponde a datos sobre Casos de Dengue Detalle por semana epidemiologica según años. 
-
+Esta es la base de datos que brindó acceso el Dr. Fabio Sánchez y corresponde a datos sobre Casos de Dengue Detalle por semana epidemiologica según años.
 
 ```{r}
 df1_Dengue = read_excel(path = here("2. Data", "base_fabio_dengue.xlsx"), sheet = 1)
@@ -337,7 +325,6 @@ df1_Dengue = df1_Dengue %>%
   ) %>% 
   select(`Semana/indicador`, Year, Week, everything())
 ```
-
 
 ## Casos de dengue de 1993 a 2012
 
@@ -376,9 +363,7 @@ df1_Dengue = df1_Dengue %>%
   select(Year, Week, PROVINCIA, COD_CANTON, CANTON, Conteo)
 ```
 
-
 Este mapa de calor presenta la distribución temporal de los casos de dengue a nivel nacional, mostrando el número de casos reportados en cada semana epidemiológica y año, utilizando una escala logarítmica para resaltar la variación en la incidencia. En el gráfico, el eje vertical (Y) representa los años del período de estudio, mientras que el eje horizontal (X) corresponde a las semanas del año, de la 1 a la 53. La intensidad de color refleja el nivel de incidencia: los colores más intensos indican una mayor cantidad de casos reportados en esa semana específica de un año determinado. Aunque los datos aquí mostrados son a nivel país, también se dispone de información detallada a nivel cantonal, lo que permite un análisis más desagregado de los patrones de brote y de la estacionalidad en áreas específicas.
-
 
 ```{r}
 df1_Dengue %>% 
@@ -447,8 +432,7 @@ df1_Poblacion = df1_Poblacion %>%
   select(Year, PROVINCIA, COD_CANTON, CANTON, Poblacion)
 ```
 
-
-Desde 1993 hasta 2012 se han experimentado por cantón la siguiente cantidad de casos de dengue: 
+Desde 1993 hasta 2012 se han experimentado por cantón la siguiente cantidad de casos de dengue:
 
 ```{r}
 # Ahora sacamos el conteo por año y canton: 
@@ -478,8 +462,6 @@ casos_totales_all = totales_pob_all_years %>%
 
 casos_totales_all
 ```
-
-
 
 ```{r}
 ## Población 2015 a 2020
@@ -571,8 +553,6 @@ df1_Dengue_15_20 = df1_Dengue_15_20 %>%
   select(Year, PROVINCIA, COD_CANTON, CANTON, Conteo)
 ```
 
-
-
 ```{r}
 df1_pob_dengue_15_20 = df1_Poblacion_15_20 %>% 
   select(Year, COD_CANTON, Poblacion) %>% 
@@ -585,7 +565,7 @@ df1_pob_dengue_15_20 = df1_Poblacion_15_20 %>%
 df1_pob_dengue_15_20
 ```
 
-En esta sección se presenta por año el número de casos de dengue (Conteo), la población por cantón y la tasa de incidencia de cada cantón. 
+En esta sección se presenta por año el número de casos de dengue (Conteo), la población por cantón y la tasa de incidencia de cada cantón.
 
 ```{r}
 # https://oges.ministeriodesalud.go.cr/visores/catalogo/enfermedades_vectoriales/dengue_chicongunya.html
@@ -599,17 +579,13 @@ df1_pob_dengue_15_20 = df1_pob_dengue_15_20 %>%
 df1_pob_dengue_15_20
 ```
 
-
----
-
-
-
+------------------------------------------------------------------------
 
 ## Promedios hoja TOTALES
 
 ### Casos de dengue
 
-En esta tabla se pueden observar la cantidad de casos para los dos períodos de estudio (1993-2012 y 2015-2020), por cantón. 
+En esta tabla se pueden observar la cantidad de casos para los dos períodos de estudio (1993-2012 y 2015-2020), por cantón.
 
 ```{r}
 dengue_final = df1_pob_dengue_15_20 %>% 
@@ -636,7 +612,7 @@ dengue_final
 
 ### Población
 
-Aquí podemos observar el número total de personas para los dos períodos de estudio y la población total. 
+Aquí podemos observar el número total de personas para los dos períodos de estudio y la población total.
 
 ```{r}
 poblacion_final = df1_pob_dengue_15_20 %>% 
@@ -666,17 +642,15 @@ poblacion_final
 
 Los siguientes resultados corresponden a porcentaje de incidencia acumulada de casos de dengue en cada región para el período de 1993 a 2020. Específicamente, la tasa nos dice qué porcentaje de la población total de cada cantón $(i)$ ha sido afectada por el dengue durante ese periodo.
 
-
 $$
 \text{Tasa Acumulada de 1993 a 2020} = \dfrac{\text{Cantidad de casos de dengue}_{i}}{\text{Población entre 1993 y 2020}_{i}} \times 100
 $$
 
-#### Interpretación (ejemplo): 
+#### Interpretación (ejemplo):
 
 Durante el período de 1993 a 2020, aproximadamente el 2.55% de la población total del cantón de San José fue afectada por casos de dengue.
 
 Esto significa que, de cada 100 personas que vivieron en el cantón de San José durante este periodo, aproximadamente 2 a 3 personas registraron un caso de dengue.
-
 
 ```{r}
 tasa_93_20 = dengue_final %>% 
@@ -755,7 +729,6 @@ geo_canton %>%
     )
 ```
 
-
 ### Casos de dengue acumulados de 2015 a 2020
 
 ```{r}
@@ -784,7 +757,6 @@ geo_canton %>%
     )
 ```
 
-
 ```{r}
 df_totales %>% 
   select(COD_CANTON, CANTON, Conteo_15_20) %>% 
@@ -794,10 +766,7 @@ df_totales %>%
   #head(10)
 ```
 
-
-
 ### Casos de dengue acumulados de 1993 a 2020
-
 
 ```{r}
 # Unión de los datos con las geometrías:
@@ -836,10 +805,7 @@ df_totales %>%
   #head(10)
 ```
 
-
-
 ### Tasa de Incidencia Acumulada (1993 a 2020)
-
 
 ```{r}
 # Unión de los datos con las geometrías:
@@ -879,11 +845,3 @@ df_totales %>%
   rename(Tasa = 3) #%>% 
   #head(10)
 ```
-
-
-
-
-
-
-
-
